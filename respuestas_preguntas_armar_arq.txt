@@ -1,0 +1,35 @@
+1. usamos flutter, elixir, por parte de firebase y postgreSQL no tengo conocimiento de dichas tecnologias, sin embargo recuerdo haber hecho uso de mysql y mongodb en cursos anteriores.
+2. por mi parte seria el rol de movil, mis otros compañeros asumirian backedn y diseño, pero lo que se busca es trabajar en equipo los 3 a pesar de que por mi parte trabaje con la parte movil.
+3. el mvp como tal no tenemos fecha aun, sin embargo para el dia 28 de octubre tenemos que presentar un avance, no prohiben el uso de agentes de código pero si se hace uso de ellos llegariamos mas antes al mvp y llegar incluso a probar con personas o usuarios.
+4. se tiene que mostrar lo que se ha puesto en lo que daremos en el mvp como tal llegar a subir la app store o play store creo que no ya que hay un segundo curso en donde si se hace eso.
+5. no, por mi parte y la de mis compañeros no contamos con dicho dispositivo, solo tengo yo un iphone 17 pro pero no cuento con mas elementos de dicha marca.
+
+6. en el piloto no podria afirmar una cantidad como tal pero podria llegar a ser 50 o incluso menos probando la app.
+7. en la universidad como tal, es decir se probaria con alumnos de la universidad, pero se supone que debemos usar una api que nos permita hacer uso o ver el mapa de por lo menos arequipa.
+8. menos de 1 min, ya que dicho tiempo creo yo que es el tiempo en que la gente puede tener el celular en la mano o guardarlo en el pantalon o en algun bolsillo.
+9. eso se tiene que discutir ya que el tema de tiempo real llega a afectar el rendimiento de la app si no se optimiza de manera correcta pero lo ideal es en tiempo real.
+
+10. funciona en la demo.
+11. creo que a futuro podria servir haciendo uso de tecnologias nuevass pero por ahora debe tener acceso a una red movil o datos.
+12. no podemos perder información, por ende se debe priorizar el escalado en horizontal aunque para la demo eso deja de ser relevante ya aun no se ve eso como tal.
+13. si deberia tener un guardia o persona encargada de ti que revise el porque fallo o un grupo de personas (a futuro).
+
+14. la verdad, como tal el otp deberia confirmarse con una identificacion de la persona es decir lo que se busca es mitigar ese problema de falsos positivo, entonces debe verificarse que la cuenta le pertenece a una persona real, y la forma es verificando por dni, ya que por cel es mas frecuente a que no funcione ya que pueden a ver personas malas que tengan numeros a nombre de otras personas.
+15. todo reporte o informe se busca guardar pero de manera que no ocupe mucho espacio, pero si, deberia guardarse y no perderse. aunque si ya pasado un buen tiempo osea 5 años no se puede dejar de ser relevante en la bd.
+16. deberia haber, pero por su parte lo que se busca es que la misma gente reporte para que los demas users vean lo que pasa no es tanto como una central de monitoreo.
+17. los datos que se entregan son las imagenes que son entregadas de manera segura y que deberian creo yo entregarse de manera encriptada y que la pnp o la entidad desencripte como tal con una llave de ellos. sin embargo los datos de los reportantes no se entrega.
+18. no piden que cumplamos algun estandar, pero por mi parte que me quiero dedicar a la ciberseguiridad estoy empapado o tengo conocimiento de estandares de seguridad y etc.
+19. todo reporte debe ser tratado de la misma manera, aunque debemos tomar en cuenta lo que reporten ya que si por ejemplo un hombre tiene un arma blanca puede herir a la mujer o a otra persona.
+
+20. al mes por ahora que es mvp y se busca ser un start up deberia ser de 0 $ pero mas adelante puede ser que invirtamos dinero o se vea el ingreso de capital externo, y se haga dilution y equity del starup.
+21. creo que si, la verdad no se con exactitud.
+22. prefiero que sea gratuito o incluso que eso se cobre al user aunque no se que tan beneficioso sea esta idea.
+
+23. validacion comunitaria.
+24. podrian entrar las dos.
+25. si con openstreetmap
+26. creo que no, ya que dicho panel seria creo para uso de otras entidades o no?
+
+27. repo unico con app backend juntos pero obvio en carpetas separadas cada una en su parte.
+28. creo que demo funcional debo preguntar igual que es lo que pide el profesor.
+29. no tengo conocimiento de ellos, pero se que riverpod brinda algo de seguridad. mientras que bloc es una estructura rigida y explicita.

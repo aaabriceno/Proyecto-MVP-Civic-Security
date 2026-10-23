@@ -1,0 +1,140 @@
+# ============================================================
+# Civic Security MVP - .gitignore (Flutter / Dart)
+# ============================================================
+
+# ---------- Dart / Flutter ----------
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata.bak
+pubspec_overrides.yaml
+*.g.dart.tmp
+
+# Código generado por build_runner (descomentar si el equipo decide NO versionarlo)
+# *.g.dart
+# *.freezed.dart
+# *.mocks.dart
+
+# Símbolos de ofuscación y debug info (flutter build --obfuscate --split-debug-info)
+*.symbols
+debug-info/
+app.*.symbols
+app.*.map.json
+
+# Cobertura y pruebas
+coverage/
+*.lcov
+test/**/failures/
+
+# Documentación generada (dart doc)
+doc/api/
+
+# ---------- Android ----------
+**/android/.gradle/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/gradle/wrapper/gradle-wrapper.jar
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/key.properties
+*.jks
+*.keystore
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ---------- iOS / macOS ----------
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/.vagrant/
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/Pods/
+**/ios/**/.symlinks/
+**/ios/**/profile
+**/ios/**/xcuserdata
+**/ios/.generated/
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+*.ipa
+*.dSYM.zip
+*.mobileprovision
+*.p12
+*.cer
+
+# ---------- Web / Desktop (si se habilitan) ----------
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+**/web/.dart_tool/
+
+# ---------- Secretos y configuración sensible ----------
+# Nunca subir claves: HMAC del servidor, JWT, Twilio, R2/S3, etc.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+lib/**/secrets.dart
+lib/**/env.g.dart
+
+# Firebase: contienen API keys del proyecto. Si el repo es público, mantenerlos ignorados
+# y distribuirlos por canal seguro / secretos de GitHub Actions.
+**/android/app/google-services.json
+**/ios/Runner/GoogleService-Info.plist
+**/lib/firebase_options.dart
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# ---------- IDEs y editores ----------
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+
+# ---------- Sistema operativo ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.directory
+
+# ---------- Logs y temporales ----------
+*.log
+*.tmp
+*.temp
+.history/
