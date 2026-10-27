@@ -11,6 +11,8 @@ config :civic,
   ecto_repos: [Civic.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
+config :civic, Civic.Repo, types: Civic.PostgresTypes
+
 # Configure the endpoint
 config :civic, CivicWeb.Endpoint,
   url: [host: "localhost"],
