@@ -1,9 +1,9 @@
 # Civic Security — Arquitectura del MVP
 
-**Versión:** 0.1 (borrador para revisión del equipo) · **Fecha:** 2026-10-23
+**Versión:** 0.2 (decisiones del equipo incorporadas) · **Fecha:** 2026-10-27
 **Base:** `civic-security-contexto-mvp.md` + respuestas del equipo (`respuestas_preguntas_armar_arq.txt`)
 
-Las decisiones marcadas con **[decisión técnica]** las tomó el arquitecto sin pregunta explícita al equipo; se pueden cambiar. Las marcadas con **[CONFIRMAR]** necesitan aprobación del equipo antes de construir (resumen en la sección 18).
+Las decisiones marcadas con **[decisión técnica]** las tomó el arquitecto sin pregunta explícita al equipo; se pueden cambiar. Las decisiones confirmadas por el equipo están en la sección 18.
 
 ---
 
@@ -16,8 +16,8 @@ Las decisiones marcadas con **[decisión técnica]** las tomó el arquitecto sin
 | Backend | Elixir + Phoenix (el equipo ya lo conoce) · REST `/v1` + Phoenix Channels · Oban (colas persistentes en Postgres, sin Redis). |
 | Datos | PostgreSQL + PostGIS (Neon, capa gratuita con respaldos) · fotos en Cloudflare R2 (10 GB gratis, URLs firmadas). |
 | Tiempo real | Pines y mapa de calor en vivo por canales por **celda geohash**; el calor se agrega al escribir, así leerlo es barato. |
-| Alertas push | FCM **por tópicos geohash**: las zonas (Casa, Trabajo) viven solo en el teléfono; el servidor nunca sabe dónde vive el usuario. **[CONFIRMAR]** |
-| Verificación de persona real | Piloto: **correo institucional UCSP con OTP** (gratis, prueba que es alumno real). DNI/KYC se diseña como proveedor enchufable para después. **[CONFIRMAR]** |
+| Alertas push | Cliente-servidor: las zonas (Casa, Trabajo) **se guardan en el servidor** con índice grueso (celdas geohash) en claro y centro exacto **cifrado**; el servidor hace el *match* y envía FCM por token. P2P descartado para el MVP (sección 9.2). |
+| Verificación de persona real | **DNI** (8 dígitos) con privacidad por diseño: solo se guarda `HMAC(DNI, clave secreta)`; nunca el número ni el nombre. Una cuenta por DNI. KYC (DNI + selfie) como proveedor enchufable a futuro. |
 | Anonimato | Reporte y voto sin `usuario_id`; tokens HMAC por incidente; vínculo para reputación cifrado y **destruido** al resolverse (crypto-shredding). |
 | Disponibilidad | Objetivo de demo (~95 %), pero **sin pérdida de datos** (RPO ≈ 0 con PITR + copia diaria en otro proveedor). |
 | Estándares | OWASP MASVS v2 (app), OWASP ASVS nivel 2 (backend), OWASP API Top 10 2023, NIST SP 800-63B (autenticación), Ley N.º 29733. |
@@ -65,7 +65,7 @@ Microservicios para 3 personas y 50 usuarios multiplican la operación (redes, d
 | Código app | Un módulo por *feature* con capas `data/domain/presentation` | 1 binario; dependencias inyectadas por Riverpod |
 | Red | Recursos REST bien definidos | Endpoint agregado `GET /v1/map/snapshot` (pines + calor en 1 llamada); 1 WebSocket multiplexado |
 | Datos | Tablas normalizadas por contexto | Agregado precalculado `celda_calor` (se lee sin `GROUP BY` costoso) |
-| Trabajo asíncrono | Un *worker* Oban por caso de uso | Una sola cola persistente en Postgres; *fan-out* de push delegado a FCM por tópico |
+| Trabajo asíncrono | Un *worker* Oban por caso de uso | Una sola cola persistente en Postgres; *match* de zonas con un índice GIN y envío de push en lote |
 
 **Ruta de evolución:** si un contexto (por ejemplo, `Alerts`) necesita escalar aparte, ya tiene su frontera y su API pública. Extraerlo a un servicio es mover código, no reescribir.
 
@@ -79,7 +79,7 @@ Microservicios para 3 personas y 50 usuarios multiplican la operación (redes, d
                     │  ├─ features/* (auth, map, report, validation, alerts, evidence, profile)     │
                     │  ├─ ML Kit Face Detection + difuminado + re-encode (sin EXIF)                │
                     │  ├─ flutter_secure_storage (tokens, código de recuperación jamás)            │
-                    │  └─ Zonas de alerta (solo locales) → suscripción a tópicos FCM geohash       │
+                    │  └─ Registro de token FCM + zonas de alerta (CRUD contra el servidor)        │
                     └───────┬───────────────────────┬────────────────────────┬────────────────────┘
                      HTTPS (REST /v1)        WSS (Phoenix Channels)     PUT firmado (foto)
                             │                       │                        │
@@ -88,7 +88,7 @@ Microservicios para 3 personas y 50 usuarios multiplican la operación (redes, d
                     │  ┌────────────── contextos ─────────┐ │          │  evidencias       │
                     │  │ Accounts  Verification  Privacy  │ │          └──────────────────┘
                     │  │ Incidents Validation   Geo       │ │
-                    │  │ Evidence  Alerts                 │ │──FCM HTTP v1 (topic)──► Firebase Cloud
+                    │  │ Evidence  Alerts                 │ │──FCM HTTP v1 (token)──► Firebase Cloud
                     │  └──────────────────────────────────┘ │                         Messaging ──► push
                     │  Phoenix.PubSub · Oban · Hammer (ETS) │
                     └───────────────────┬───────────────────┘
@@ -97,7 +97,7 @@ Microservicios para 3 personas y 50 usuarios multiplican la operación (redes, d
                     │  PostgreSQL + PostGIS (Neon)           │ ─────────────────────────► R2 (bucket backups)
                     │  datos + cola Oban + agregados de calor│
                     └────────────────────────────────────────┘
-        Externos: proveedor de correo (OTP UCSP) · API HIBP (k-anonimato) · Sentry (errores, sin PII)
+        Externos: API HIBP (k-anonimato) · Sentry (errores, sin PII) · (futuro) proveedor KYC
 ```
 
 ---
@@ -125,12 +125,12 @@ app/lib/
 │   └── errors/             # tipos de falla de dominio
 ├── features/
 │   ├── onboarding/         # 01 Bienvenida
-│   ├── auth/               # 02 Login, 03 Registro, 04 Código de recuperación, verificación UCSP
+│   ├── auth/               # 02 Login, 03 Registro, 04 Código de recuperación, verificación DNI
 │   ├── map/                # 05 Mapa, 05b Calor
 │   ├── report/             # 06 Reportar, 06c Ajustar ubicación, 07 Enviado
 │   ├── evidence/           # 06a Cámara, 06b Revisar foto (difuminado)
 │   ├── incident/           # 08 Detalle + votos
-│   ├── alerts/             # 09 Alertas + zonas locales + FCM tópicos
+│   ├── alerts/             # 09 Alertas + zonas (servidor) + registro de token FCM
 │   └── profile/            # 10 Perfil
 └── shared/widgets/         # componentes de diseño reutilizables
 ```
@@ -166,13 +166,13 @@ app/lib/
 | Contexto | Responsabilidad | Dueño de las tablas |
 |---|---|---|
 | `Accounts` | Alias, contraseñas (Argon2id), sesiones, invitados, recuperación, borrado de cuenta | `usuario`, `refresh_token`, `consentimiento` |
-| `Verification` | Prueba de persona real mediante proveedores enchufables: `UcspEmail` (MVP), `Phone`, `DniKyc` (futuro) | `verificacion_pendiente` |
-| `Privacy` | HMAC con claves versionadas, cifrado de referencias, retención y purga | — (funciones puras + jobs) |
+| `Verification` | Prueba de persona real mediante proveedores enchufables: `DniHmac` (MVP), `DniKyc` (futuro) | — (escribe `usuario.verif_hash`) |
+| `Privacy` | HMAC con claves versionadas, cifrado de campos (Cloak.Ecto, AES-256-GCM), retención y purga | — (funciones puras + jobs) |
 | `Incidents` | Crear reporte, máquina de estados, consultas por bbox | `incidente` |
 | `Validation` | Votos, regla de 3 a < 1 km, reputación | `confirmacion` |
 | `Geo` | Geohash, celdas, agregado de calor | `celda_calor` |
 | `Evidence` | URLs firmadas, verificación y re-encode de fotos | `evidencia` |
-| `Alerts` | Broadcast por canales y push FCM por tópico | — |
+| `Alerts` | Zonas de alerta, tokens de dispositivo, *match* incidente→zona, broadcast por canales y push FCM | `zona_alerta`, `dispositivo` |
 
 Reglas: un contexto solo llama a la API pública de otro, nunca a sus schemas ni a su `Repo`. Se verifica con la librería `boundary` en compilación. La comunicación asíncrona entre contextos usa jobs de Oban (persistentes) o `Phoenix.PubSub` (efímeros).
 
@@ -193,7 +193,7 @@ backend/
 ```
 
 ### 5.3 Librerías
-`phoenix`, `ecto_sql` + `postgrex` + `geo_postgis`, `oban`, `hammer` (rate limiting en ETS), `argon2_elixir`, `joken` (JWT) o `Phoenix.Token`, `req` + `goth` (FCM HTTP v1), `ex_aws_s3` (firmas S3 para R2), `swoosh` (correo OTP), `image` (re-encode de fotos), `geohash`, `boundary`. Para calidad y seguridad: `credo`, `sobelow`, `mix_audit`, `sentry`.
+`phoenix`, `ecto_sql` + `postgrex` + `geo_postgis`, `oban`, `hammer` (rate limiting en ETS), `argon2_elixir`, `joken` (JWT) o `Phoenix.Token`, `cloak_ecto` (cifrado de campos), `req` + `goth` (FCM HTTP v1), `ex_aws_s3` (firmas S3 para R2), `image` (re-encode de fotos), `geohash`, `boundary`. Para calidad y seguridad: `credo`, `sobelow`, `mix_audit`, `sentry`.
 
 ---
 
@@ -202,7 +202,7 @@ backend/
 ```
 usuario
   id uuid PK · alias text UNIQUE · password_hash text (Argon2id)
-  nivel enum(invitado, verificado) · verif_hash bytea UNIQUE NULL   -- HMAC(correo|DNI normalizado, k_verif_vN)
+  nivel enum(invitado, verificado) · verif_hash bytea UNIQUE NULL   -- HMAC-SHA256(k_verif_vN, DNI normalizado)
   recovery_hash text · reputacion int DEFAULT 0
   intentos_fallidos int · bloqueado_hasta timestamptz · creado_en timestamptz
   -- NO hay: nombre, teléfono, correo, DNI, IP
@@ -237,11 +237,18 @@ celda_calor
   gh7 text · hora timestamptz (truncada) · tipo enum · peso_total numeric
   PK (gh7, hora, tipo)
 
-verificacion_pendiente
-  id · usuario_id FK · codigo_hash · intentos smallint · expira_en
-```
+zona_alerta
+  id uuid PK · usuario_id FK ON DELETE CASCADE · nombre text(≤30)     -- "Casa", "Trabajo"
+  radio_m smallint CHECK (100..2000)
+  celdas text[]                -- geohash-6 que cubren el círculo; índice GIN; es el índice "grueso" (~1 km)
+  centro_cifrado bytea         -- AES-256-GCM({lat,lng}) con Cloak.Ecto; solo se descifra en memoria al hacer match
+  activa bool · creado_en
+  -- máximo 3 zonas por cuenta
 
-**Ya no existe `zona_suscrita` en el servidor:** las zonas viven solo en el teléfono (sección 9.2). **[CONFIRMAR]**
+dispositivo
+  id uuid PK · usuario_id FK ON DELETE CASCADE · fcm_token_cifrado bytea · plataforma enum(android, ios)
+  actualizado_en               -- tokens inválidos (respuesta 404/UNREGISTERED de FCM) se borran
+```
 
 ---
 
@@ -272,7 +279,9 @@ verificacion_pendiente
 | POST | `/auth/register` | alias, contraseña (≥ 12 caracteres, revisada contra HIBP), consentimiento |
 | POST | `/auth/login` · `/auth/refresh` · `/auth/logout` | Refresh rotativo con detección de reuso |
 | POST | `/auth/recover` | Código de recuperación → nueva contraseña |
-| POST | `/verification/email/start` · `/verification/email/confirm` | OTP de 6 dígitos, 10 min, 5 intentos |
+| POST | `/verification/dni` | `{dni}` → valida formato, calcula HMAC, marca la cuenta `verificado`; 409 si el DNI ya está en uso; 5 intentos/día por cuenta |
+| GET / POST / PATCH / DELETE | `/me/zones[/:id]` | Zonas de alerta; la app envía centro + radio, el servidor calcula `celdas` y cifra el centro |
+| PUT | `/me/device` | Registra o rota el token FCM del dispositivo |
 | GET | `/map/snapshot?bbox&window=1h\|24h\|7d&types` | **Grano grueso:** pines + celdas de calor en 1 respuesta, con `ETag` |
 | POST | `/incidents` | Header `Idempotency-Key`; responde `201 {id, estado}` |
 | GET | `/incidents/:id` | Detalle + progreso de verificación (2/3) |
@@ -305,7 +314,7 @@ App                     Phoenix                         Postgres                
  │◄── 201 {id, estado} ───│                                │                       │                       │
  │                        │ PubSub broadcast celda:gh6 ─────────────────────────────────────────────────────►│ (app abiertas)
  │                        │                                │── job ───────────────►│                       │
- │                        │                                │                       │── topic gh6_xxxx ────►│ push (app cerrada)
+ │                        │                                │                       │── match zonas ───────►│ push por token (app cerrada)
 ```
 - **Outbox transaccional:** el job de alerta se escribe en la misma transacción que el reporte. Si el servidor cae justo después del commit, el job sigue en la base de datos y se ejecuta al reiniciar. No se pierden alertas.
 - **Política de push contra rumores** (el diferencial del producto es la *desconfianza en información no verificada*): **[decisión técnica]**
@@ -313,13 +322,24 @@ App                     Phoenix                         Postgres                
   - Reporte de invitado → push solo cuando pase a "Verificado".
   - Severidad **alta** (por ejemplo, "hay arma blanca o de fuego", una casilla del formulario) → push inmediato siempre, incluso si viene de un invitado. Esto atiende la respuesta 19: mismo trato para todos los reportes, con prioridad por el peligro.
 
-### 9.2 Alertas por zona sin que el servidor sepa dónde vives
-1. El usuario define la zona Casa (centro + radio ≤ 1 km) **en el teléfono**.
-2. La app calcula las celdas geohash-6 (~1,2 × 0,6 km) que cubren ese círculo (~10–20 celdas) y se suscribe a esos **tópicos FCM**.
-3. Ante un reporte, el servidor publica un mensaje de datos al tópico de la celda del incidente.
-4. La app recibe el mensaje en segundo plano, calcula la distancia exacta y muestra la notificación local solo si cae dentro del radio.
+### 9.2 Alertas por zona (cliente-servidor, ubicación exacta cifrada)
+Decisión del equipo: las zonas se guardan en el servidor. Para no exponer dónde vive el usuario, se separa un **índice grueso en claro** de un **dato exacto cifrado**:
 
-Ventajas: el servidor no guarda ubicaciones de casas, y el *fan-out* lo hace Google (grano grueso, gratis, escala solo). Contras: Google ve suscripciones a celdas aproximadas, y las zonas no se sincronizan entre dispositivos. **[CONFIRMAR]**
+1. La app envía `POST /v1/me/zones {nombre, lat, lng, radio_m}`.
+2. El servidor calcula las celdas geohash-6 (~1,2 × 0,6 km) que cubren el círculo y las guarda en `celdas` (en claro, con índice GIN). Cifra `{lat, lng}` con AES-256-GCM (Cloak.Ecto, clave fuera de la base de datos) en `centro_cifrado`.
+3. Ante un reporte nuevo, el worker de Oban busca candidatos con `WHERE celdas @> ARRAY[gh6_del_incidente]`. Esta consulta solo usa el índice grueso.
+4. Para cada candidato descifra el centro **solo en memoria**, calcula la distancia exacta y, si cae dentro del radio, envía FCM a los tokens de sus dispositivos. Se excluye al propio reportante.
+
+Resultado: un volcado de la base de datos sin la clave solo revela zonas con una precisión de ~1 km, no la dirección de la casa. Las zonas se sincronizan entre dispositivos y se borran en cascada con la cuenta.
+
+**Por qué no P2P en el MVP.** Una red de teléfonos que comparten eventos entre sí suena atractiva, pero choca con el núcleo del producto:
+- **La validación comunitaria necesita una sola fuente de verdad.** En P2P cada nodo puede inventar votos o cuentas (ataque Sybil) y no hay quién imponga "3 votos de cuentas verificadas a < 1 km". Justamente el problema de WhatsApp es la información sin verificar.
+- **Conectividad:** con datos móviles los teléfonos están detrás de CGNAT y no se pueden conectar directamente; Android además suspende los procesos en segundo plano. En la práctica igual haría falta un servidor de relevo.
+- **Batería y privacidad:** mantener conexiones entre pares gasta batería y expone la IP de cada usuario a desconocidos.
+
+P2P (Bluetooth / Wi-Fi Direct) queda como idea futura **de respaldo sin internet** (por ejemplo, en un sismo, algo relevante en Arequipa), no como arquitectura principal.
+
+**Otros tipos de evento** (tráfico, choques): quedan fuera del MVP por decisión del equipo; la prioridad es la seguridad de las personas. El modelo lo soporta después agregando valores al `enum tipo`.
 
 ### 9.3 Votar → verificación (sin condiciones de carrera)
 Validaciones previas: la cuenta es `verificado`, no es el reportante, está a < 1 km (`ST_DWithin`), la ubicación no es simulada y no superó el rate limit. Luego, en una sola transacción:
@@ -343,26 +363,40 @@ RETURNING estado, confirmaciones;
 4. Un job de Oban descarga la foto, **re-codifica otra vez en el servidor** (defensa en profundidad contra metadatos o archivos manipulados) y la marca `lista`.
 5. Para verla se generan URLs firmadas de corta duración; el bucket nunca es público.
 
-**Entrega cifrada a autoridades (respuesta 17) — fase 2, no MVP.** Diseño previsto: la app cifra el **original sin difuminar** con la *clave pública de la autoridad* (cifrado híbrido, *sealed box* X25519 + XChaCha20-Poly1305) y lo sube como blob opaco. Ni el equipo ni el servidor pueden descifrarlo; solo la entidad con la clave privada. Queda fuera del MVP porque (a) hoy no existe una entidad con convenio que tenga la clave, y (b) subir rostros de terceros sin difuminar requiere base legal y consentimiento según la Ley 29733. **[CONFIRMAR]**
+**Entrega cifrada a autoridades (respuesta 17) — fase 2, fuera del MVP (confirmado).** Diseño previsto: la app cifra el **original sin difuminar** con la *clave pública de la autoridad* (cifrado híbrido, *sealed box* X25519 + XChaCha20-Poly1305) y lo sube como blob opaco. Ni el equipo ni el servidor pueden descifrarlo; solo la entidad con la clave privada. Requiere antes (a) una entidad con convenio que tenga la clave, y (b) base legal para subir rostros de terceros sin difuminar según la Ley 29733.
 
 ---
 
 ## 11. Verificación de persona real (tema abierto 2 y respuesta 14)
 
-Tu objetivo, evitar cuentas falsas y números a nombre de otros, es correcto. El problema está en usar el DNI:
+**Decisión del equipo (2026-10-27):** la cuenta verificada se obtiene con el **DNI**, priorizando la privacidad. Todo reporte sigue siendo anónimo: el DNI solo prueba "una persona = una cuenta" y nunca se vincula a reportes ni votos.
 
-- Las APIs de consulta de DNI solo confirman que **el número existe** (y devuelven el nombre). Cualquiera puede escribir el DNI de otra persona. No prueban que el titular sea quien usa la app.
-- Probarlo de verdad exige **KYC**: foto del DNI + selfie con prueba de vida, con proveedores de pago (Truora, MetaMap, Veriff, etc.). No cabe en USD 0.
-- Guardar DNI convierte la base de datos en un **objetivo de alto valor** y contradice la promesa central ("seudónimo frente al sistema"). Si la base se filtra, se expone quién reporta.
+### 11.1 Flujo
+1. La app envía `POST /v1/verification/dni {dni}` por TLS. El DNI no se guarda en el teléfono.
+2. El servidor valida el formato (8 dígitos) y calcula `verif_hash = HMAC-SHA256(k_verif_v1, dni)`.
+3. Si `verif_hash` ya existe → `409` ("Este DNI ya tiene una cuenta"). Si no, guarda el hash y marca la cuenta `verificado`.
+4. El DNI en claro solo vive en memoria durante la petición. Phoenix lo filtra de los logs (`filter_parameters: ["password", "dni", ...]`) y Sentry no lo recibe.
 
-**Propuesta: verificación como proveedor enchufable (patrón *strategy*).** **[CONFIRMAR]**
+### 11.2 Por qué HMAC y no cifrado ni SHA-256
+| Opción | Problema |
+|---|---|
+| Guardar el DNI en claro | Una filtración expone la identidad de todos los usuarios |
+| **Cifrar** el DNI (AES) | Es reversible: quien obtenga la clave recupera todos los DNIs, y el sistema "tiene" los DNIs ante cualquier pedido de datos. Además, nunca necesitamos volver a leer el DNI, solo saber si ya se usó |
+| SHA-256 simple | Solo hay 10⁸ DNIs posibles: se recorren todos en segundos y se revierte el hash |
+| **HMAC con clave secreta** ✅ | Irreversible para quien tenga solo la base de datos; permite comprobar duplicados. La clave vive como secreto del entorno, nunca en la base de datos ni en el repo, y está versionada para poder rotarla |
+
+**Riesgo residual:** si un atacante obtiene **a la vez** la base de datos y `k_verif`, puede recorrer los 10⁸ DNIs y revertir los hashes. Mitigación: clave separada de las demás, acceso mínimo a los secretos y rotación. A futuro se puede guardar `k_verif` en un KMS o HSM, de modo que el servidor pida el HMAC sin conocer nunca la clave.
+
+### 11.3 Limitación conocida (aceptada para el MVP)
+Escribir un DNI no prueba que la persona sea su titular: alguien puede usar el DNI de otro. Mitigaciones del MVP: una cuenta por DNI, 5 intentos por día por cuenta y aviso en la UI de que suplantar a otra persona es delito. No se consultan APIs de RENIEC porque devuelven el nombre de la persona y eso rompe la minimización de datos.
+
+### 11.4 Evolución: proveedor enchufable (patrón *strategy*)
 | Fase | Proveedor | Qué prueba | Qué se guarda |
 |---|---|---|---|
-| **MVP / piloto UCSP** | Correo institucional `@ucsp.edu.pe` + OTP | Alumno real, una cuenta por correo | Solo `HMAC(correo, k_verif)`; el correo se descarta |
-| Expansión ciudad | Teléfono + OTP (Firebase Phone Auth) | Línea real | Solo `HMAC(teléfono)` |
-| Producción | KYC de terceros (DNI + selfie + prueba de vida) | Persona única real | Solo `HMAC(DNI)` + "verificado = sí"; **nunca** el DNI, el nombre ni las fotos |
+| **MVP** | `DniHmac` | Una cuenta por número de DNI | Solo `HMAC(DNI)` |
+| Producción | `DniKyc`: KYC de terceros (DNI + selfie + prueba de vida) | Que la persona es la titular | Solo `HMAC(DNI)` + "verificado = sí"; **nunca** el DNI, el nombre ni las fotos (el proveedor las procesa y no las devuelve) |
 
-Con este esquema se cumple tu requisito (una persona = una cuenta, verificada de verdad) sin que Civic Security llegue a conocer la identidad. Además: **no cobrar la verificación al usuario** (respuesta 22). Cobrar frena la adopción justo en la etapa en que la red necesita masa crítica, y un pago con tarjeta crea un vínculo de identidad nuevo.
+Como ambas fases guardan el mismo `HMAC(DNI)`, al pasar a KYC las cuentas existentes no se pierden: solo se les pide completar la prueba de vida. **No se cobra la verificación al usuario** (respuesta 22): frena la adopción y un pago con tarjeta crea un vínculo de identidad nuevo.
 
 ---
 
@@ -422,7 +456,7 @@ Una aclaración sobre la respuesta 12: **el escalado horizontal no evita perder 
 3. Oban ya funciona en multinodo.
 4. El rate limit de Hammer pasa de ETS a un backend compartido.
 5. Postgres: primero escalado vertical, luego réplicas de lectura para `map/snapshot`; particionar `incidente` por año cuando pase del millón de filas.
-6. El push ya escala porque FCM hace el *fan-out*.
+6. Push: con muchos usuarios por celda, el *match* de zonas pasa a enviar lotes con FCM *multicast* (hasta 500 tokens por llamada) desde varios workers de Oban en paralelo.
 
 ---
 
@@ -432,11 +466,10 @@ Una aclaración sobre la respuesta 12: **el escalado horizontal no evita perder 
 
 | Pieza | Servicio | Nota |
 |---|---|---|
-| Backend Phoenix | **Fly.io** (despliegue oficial de Phoenix; ~USD 0–5/mes, cubrible con créditos educativos) **o** VM *Always Free* de Oracle Cloud con Docker (USD 0 estricto, más operación manual) | **[CONFIRMAR]** |
+| Backend Phoenix | Hasta la iteración 4: **local** (`docker compose` en la laptop; teléfonos Android en la misma red Wi-Fi). Para el piloto: **Fly.io** (~USD 0–5/mes, cubrible con créditos educativos) **o** VM *Always Free* de Oracle Cloud (USD 0 estricto, más operación) | Se decide en la iteración 5 |
 | PostgreSQL + PostGIS | Neon (capa gratuita) | Gestionado, con restauración |
 | Fotos y respaldos | Cloudflare R2 | 10 GB gratis, sin costo de salida |
 | Push | Firebase Cloud Messaging | Gratis |
-| Correo OTP | Brevo o Resend (capa gratuita) | Volumen del piloto muy por debajo del límite |
 | Errores | Sentry (Developer gratis) | Flutter + Elixir |
 | Monitoreo | UptimeRobot | Gratis |
 | CI/CD | GitHub Actions | Minutos gratis |
@@ -473,9 +506,9 @@ Purga diaria con un job programado de Oban (`Oban.Plugins.Cron`). Estimación: 5
 | Hito | Contenido |
 |---|---|
 | **Avance 28 oct** | Este documento + diagrama · monorepo creado · *walking skeleton*: app Android con mapa OSM centrado en la UCSP → formulario de reporte → `POST /v1/incidents` → Postgres → pin visible en otro teléfono en tiempo real por canal |
-| Iteración 1 | Auth (invitado, registro, login, refresh, recuperación) + verificación por correo UCSP + consentimiento |
+| Iteración 1 | Auth (invitado, registro, login, refresh, recuperación) + verificación por DNI con HMAC + consentimiento |
 | Iteración 2 | **Validación comunitaria completa** (prioridad n.º 1, respuesta 23): votos, regla de 1 km, estados, reputación con crypto-shredding |
-| Iteración 3 | Mapa de calor en vivo + alertas FCM por tópicos + zonas locales |
+| Iteración 3 | Mapa de calor en vivo + zonas de alerta en el servidor (centro cifrado) + push FCM |
 | Iteración 4 | Evidencia con difuminado + URLs firmadas + re-encode |
 | Iteración 5 | Endurecimiento: rate limits, Sobelow limpio, pentest MASTG, monitoreo, runbook → **piloto con alumnos UCSP** |
 
@@ -491,12 +524,13 @@ civic-security/
 
 ---
 
-## 18. Decisiones que el equipo debe confirmar
-1. **Verificación por correo institucional UCSP** en el MVP en lugar de DNI o teléfono; KYC con DNI en el futuro, sin guardar el DNI.
-2. **Zonas de alerta solo en el teléfono** (tópicos FCM) en lugar de guardarlas en el servidor.
-3. **Hosting:** Fly.io (USD 0–5, menos operación) o Oracle Always Free (USD 0 estricto, más operación).
-4. **Demo solo en Android**; iOS en el segundo curso.
-5. **Original cifrado para la PNP:** fase 2, no MVP.
+## 18. Decisiones confirmadas por el equipo (2026-10-27)
+1. **Verificación por DNI** guardando solo `HMAC(DNI)`; no se usa correo institucional. Todo reporte es anónimo (sección 11).
+2. **Zonas de alerta en el servidor** (cliente-servidor), con índice grueso en claro y centro exacto cifrado. P2P descartado para el MVP (sección 9.2).
+3. **Demo solo en Android**; iOS más adelante.
+4. **Original cifrado para la PNP:** a futuro, fuera del MVP.
+5. **Eventos de tráfico y choques:** fuera del MVP; la prioridad es la seguridad de las personas.
+6. **Hosting:** desarrollo local hasta la iteración 4; Fly.io u Oracle se decide antes del piloto.
 
 ## 19. Qué revisar al crecer
 - Umbral fijo de 3 votos → ponderado por reputación y densidad de usuarios por zona (3 votos son muchos en una zona vacía y pocos en el centro).
