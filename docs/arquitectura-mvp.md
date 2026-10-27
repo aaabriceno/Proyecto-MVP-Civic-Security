@@ -426,6 +426,9 @@ Como ambas fases guardan el mismo `HMAC(DNI)`, al pasar a KYC las cuentas existe
 | Validación de entradas | Changesets de Ecto con listas blancas, longitud máxima, tipo enumerado, coordenadas dentro del bbox de Arequipa | ASVS V5 |
 | Archivos | URL firmada con tamaño y MIME fijos, re-encode en el servidor, bucket privado | ASVS V12 |
 | Secretos | Variables de entorno del hosting / GitHub Actions secrets; `gitleaks` en pre-commit y CI; nada en la app | ASVS V6; MASVS-CODE |
+| Acceso administrativo | **2FA con TOTP (RFC 6238)** obligatorio en GitHub, hosting, Neon/Supabase y Cloudflare para los 3 integrantes; rotación de credenciales cuando alguien sale del equipo | NIST 800-63B AAL2; ASVS V2 |
+| Acceso a la base de datos | La BD no se expone a internet (solo Phoenix se conecta, con TLS); usuario de aplicación con mínimo privilegio (sin superusuario, sin DDL); las migraciones corren con otro usuario. A futuro: credenciales dinámicas de corta vida (HashiCorp Vault o tokens IAM) | ASVS V1, V6; principio de mínimo privilegio |
+| Cifrado en reposo | Cifrado de disco del proveedor (transparente, costo ≈ 0) + cifrado de campo **solo** para datos sensibles que hay que poder leer (centro de zona, token FCM, `ref_cifrada`); HMAC para lo que solo se compara (DNI) | ASVS V6 |
 | Código de la app | `--obfuscate --split-debug-info`, sin secretos embebidos, detección de ubicación simulada; Play Integrity en fase 2 | MASVS-RESILIENCE |
 | Dependencias | Dependabot, `mix_audit`, `mix hex.audit`, OSV-Scanner para `pubspec.lock` | ASVS V14 |
 | Análisis estático | `sobelow` (seguridad Phoenix), `credo`, `flutter analyze` con lints estrictos | ASVS V14 |
