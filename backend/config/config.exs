@@ -36,13 +36,12 @@ config :phoenix, :json_library, Jason
 config :phoenix, :filter_parameters, ["password", "dni"]
 
 # Límites por cliente: {máximo de solicitudes, ventana en ms}. Sin cuentas aún,
-# el cliente es su IP (ojo: muchos alumnos tras el wifi de la universidad
-# comparten una). Se afinan por cuenta cuando exista la autenticación.
+# el cliente es su IP, y muchos alumnos tras el wifi de la universidad
+# comparten una: por eso estos valores son GENEROSOS (solo frenan inundaciones
+# masivas). El límite estricto irá por cuenta cuando exista la autenticación.
 config :civic, CivicWeb.RateLimit,
-  write: {30, :timer.minutes(10)},
-  read: {120, :timer.minutes(1)},
-  socket: {30, :timer.minutes(1)}
+  write: {120, :timer.minutes(10)},
+  read: {600, :timer.minutes(1)},
+  socket: {120, :timer.minutes(1)}
 
-# Import environment specific config. This must remain at the bottom
-# of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
