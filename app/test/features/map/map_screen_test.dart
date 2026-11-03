@@ -11,8 +11,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
-/// Posición dentro de Arequipa, lejos de la UCSP para distinguir ambos casos.
+/// Posición dentro de Arequipa (Paucarpata), lejos del centro de la vista inicial.
 const _enArequipa = LatLng(-16.4300, -71.5050);
+
+/// Vista de respaldo: toda Arequipa debe quedar visible, sin un punto fijo.
+void _expectVistaDeArequipa(MapController controller) {
+  expect(
+    controller.camera.visibleBounds.containsBounds(arequipaBounds),
+    isTrue,
+    reason: 'sin ubicación se muestra Arequipa completa',
+  );
+  expect(controller.camera.zoom, lessThan(13));
+}
 
 /// Devuelve una imagen transparente: los tests no deben salir a internet.
 class _BlankTileProvider extends TileProvider {
@@ -100,7 +110,7 @@ void main() {
     expect(find.byKey(const Key('aviso-ubicacion')), findsNothing);
   });
 
-  testWidgets('sin permiso muestra la UCSP y un aviso con Reintentar', (
+  testWidgets('sin permiso muestra Arequipa y un aviso con Reintentar', (
     tester,
   ) async {
     final service = _FakeLocationService(
@@ -108,9 +118,10 @@ void main() {
     );
     final controller = await _pumpMap(tester, service);
 
-    expect(controller.camera.center, ucspCenter);
+    _expectVistaDeArequipa(controller);
     expect(find.byKey(const Key('aviso-ubicacion')), findsOneWidget);
     expect(find.textContaining('ubicación'), findsWidgets);
+    expect(find.textContaining('UCSP'), findsNothing);
     expect(find.byKey(const Key('mi-ubicacion')), findsNothing);
 
     await tester.tap(find.text('Reintentar'));
@@ -132,15 +143,18 @@ void main() {
     expect(service.settingsCalls, 1);
   });
 
-  testWidgets('fuera de Arequipa muestra la UCSP y lo explica', (tester) async {
+  testWidgets('fuera de Arequipa muestra Arequipa y lo explica', (
+    tester,
+  ) async {
     final controller = await _pumpMap(
       tester,
       // California, la ubicación por defecto del emulador de Android
       _FakeLocationService(const LocationFound(LatLng(37.4220, -122.0841))),
     );
 
-    expect(controller.camera.center, ucspCenter);
+    _expectVistaDeArequipa(controller);
     expect(find.textContaining('fuera de Arequipa'), findsOneWidget);
+    expect(find.textContaining('UCSP'), findsNothing);
     expect(find.byKey(const Key('mi-ubicacion')), findsNothing);
   });
 
@@ -184,9 +198,10 @@ void main() {
       _FakeLocationService(const LocationFound(_enArequipa)),
     );
 
-    controller.move(ucspCenter, 16);
+    const otroLugar = LatLng(-16.3900, -71.5600);
+    controller.move(otroLugar, 16);
     await tester.pump();
-    expect(controller.camera.center, ucspCenter);
+    expect(controller.camera.center, otroLugar);
 
     await tester.tap(find.byKey(const Key('boton-mi-ubicacion')));
     await tester.pump();
@@ -197,7 +212,7 @@ void main() {
   });
 
   test('arequipaBounds reconoce puntos dentro y fuera', () {
-    expect(arequipaBounds.contains(ucspCenter), isTrue);
+    expect(arequipaBounds.contains(_enArequipa), isTrue);
     expect(arequipaBounds.contains(const LatLng(-12.0464, -77.0428)), isFalse);
   });
 }

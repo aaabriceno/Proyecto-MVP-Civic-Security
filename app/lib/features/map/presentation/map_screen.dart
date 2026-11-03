@@ -88,8 +88,11 @@ class _MapScreenState extends ConsumerState<MapScreen>
           FlutterMap(
             mapController: _controller,
             options: MapOptions(
-              initialCenter: ucspCenter,
-              initialZoom: _zoomInicial,
+              // Sin ubicación del usuario se ve Arequipa completa
+              initialCameraFit: CameraFit.bounds(
+                bounds: arequipaBounds,
+                padding: const EdgeInsets.all(16),
+              ),
               minZoom: 10,
               maxZoom: 19,
               onMapReady: _onMapReady,
@@ -183,19 +186,15 @@ class _MapScreenState extends ConsumerState<MapScreen>
 
   String _messageFor(LocationFailure reason) => switch (reason) {
     LocationFailure.serviceDisabled =>
-      'Activa la ubicación del teléfono para ver reportes cerca de ti. '
-          'Mostrando la UCSP.',
+      'Activa la ubicación del teléfono para ver reportes cerca de ti.',
     LocationFailure.denied =>
-      'Necesitamos tu ubicación para mostrarte reportes cercanos. '
-          'Mostrando la UCSP.',
+      'Necesitamos tu ubicación para mostrarte reportes cercanos.',
     LocationFailure.deniedForever =>
       'El permiso de ubicación está bloqueado. Actívalo en los ajustes de la '
-          'app. Mostrando la UCSP.',
-    LocationFailure.unavailable =>
-      'No pudimos obtener tu ubicación. Mostrando la UCSP.',
+          'app.',
+    LocationFailure.unavailable => 'No pudimos obtener tu ubicación.',
     LocationFailure.outsideArea =>
-      'Estás fuera de Arequipa; Civic Security solo opera aquí. '
-          'Mostrando la UCSP.',
+      'Estás fuera de Arequipa; por ahora Civic Security solo opera aquí.',
   };
 }
 

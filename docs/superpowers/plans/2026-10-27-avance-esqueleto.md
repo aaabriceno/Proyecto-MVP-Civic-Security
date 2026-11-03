@@ -21,7 +21,7 @@
 - Estado inicial de todo reporte: `sin_verificar`.
 - `descripcion`: opcional, se recorta (`trim`) y tiene como máximo 500 caracteres.
 - Ubicación válida solo dentro del bbox de Arequipa metropolitana: lat ∈ [-16.60, -16.25], lng ∈ [-71.75, -71.40].
-- Centro inicial del mapa (UCSP, sede San Lázaro): `LatLng(-16.3963, -71.5340)`, zoom 16. Ajustar con Google Maps si hace falta.
+- Vista del mapa: se centra en la ubicación del usuario (zoom 16). Sin ubicación, o si el usuario está fuera de Arequipa, se muestra **Arequipa completa** (ajuste de cámara a `arequipaBounds`). No hay ningún punto fijo como centro. Más adelante el mapa podrá cubrir todo el Perú.
 - JSON de un incidente: `{"id","tipo","descripcion","lat","lng","estado","creado_en"}`, donde `creado_en` va en ISO-8601 UTC.
 - Formato de error: `{"error":{"code":"...","message":"...","fields":{...}}}`; `fields` solo aparece en los 422. Nunca se devuelven *stack traces*.
 - PostGIS guarda los puntos como `{lng, lat}`. La API siempre expone `lat` y `lng` por separado.
@@ -36,7 +36,7 @@
 | Tópicos `celda:<geohash6>` | Un solo tópico `mapa:arequipa` | Iteración 3 |
 | `riverpod_generator` + `freezed` | Riverpod sin generación de código; `fromJson` escrito a mano (más fácil de entender) | Cuando el equipo domine lo básico |
 | `go_router` | `Navigator.push` | Iteración 3 (deep links desde push) |
-| GPS actual o pin | **Actualizado en la Tarea 7:** el mapa se centra en la ubicación del usuario (permiso en primer plano, punto azul que lo sigue); la UCSP es solo el centro de respaldo si no hay permiso, GPS o si está fuera de Arequipa. El pin central fijo se mantiene para ubicar el reporte | Tarea 9 usa el pin; ubicación en segundo plano, nunca |
+| GPS actual o pin | **Actualizado en la Tarea 7:** el mapa se centra en la ubicación del usuario (permiso en primer plano, punto azul que lo sigue); si no hay permiso, GPS, o el usuario está fuera de Arequipa, se muestra Arequipa completa con un aviso; no hay centro de respaldo fijo. El pin central fijo se mantiene para ubicar el reporte | Tarea 9 usa el pin; ubicación en segundo plano, nunca |
 | Rate limit, auth, `boundary` | Ninguno (el backend corre solo en la red local) | Iteraciones 1 y 5 |
 
 ## Foco de revisión
@@ -225,7 +225,7 @@ app/                                             generado por flutter create (so
 
 ---
 
-### Tarea 7: App Flutter con mapa OSM centrado en la UCSP
+### Tarea 7: App Flutter con mapa OSM centrado en la ubicación del usuario
 
 **Por qué:** es la primera pantalla visible (frame 05). Sirve para validar el entorno Android y la configuración de red.
 
@@ -240,15 +240,15 @@ app/                                             generado por flutter create (so
 
 **Interfaces:**
 - `const String apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:4000');` (10.0.2.2 es la laptop vista desde el emulador; en un teléfono real se usa `--dart-define=API_URL=http://192.168.1.7:4000`). Se agrega `wsUrl`, derivado de `apiUrl` reemplazando `http` por `ws` y añadiendo `/socket/websocket`.
-- `const ucspCenter = LatLng(-16.3963, -71.5340);`
+- `final arequipaBounds = LatLngBounds(LatLng(-16.60, -71.75), LatLng(-16.25, -71.40));` (vista de respaldo y área de servicio).
 - `MapScreen`: `FlutterMap` con `TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', userAgentPackageName: 'pe.civicsecurity.civic_security')`, atribución "© OpenStreetMap contributors" y un ícono de pin fijo superpuesto al centro.
 
 - [ ] **Paso 1:** test `"MapScreen muestra el mapa y el pin central"` → `expect(find.byType(FlutterMap), findsOneWidget)` y `find.byKey(const Key('pin-central'))`.
 - [ ] **Paso 2:** `flutter test` → FALLA.
 - [ ] **Paso 3:** implementar `env.dart`, `app.dart` (MaterialApp, `home: MapScreen()`) y `MapScreen`.
 - [ ] **Paso 4:** `flutter test` → PASA; `flutter analyze` → sin issues.
-- [ ] **Paso 5:** `flutter emulators --launch Pixel_9_Pro_XL`, luego `flutter run` → se ve Arequipa con la UCSP al centro. En el teléfono real: `flutter run --dart-define=API_URL=http://192.168.1.7:4000`.
-- [ ] **Paso 6:** commit `feat(app): scaffold Flutter app with OSM map centered on UCSP`.
+- [ ] **Paso 5:** `flutter emulators --launch Pixel_9_Pro_XL`, luego `flutter run` → se ve Arequipa completa, o el mapa centrado en el usuario si hay permiso y está en Arequipa. En el teléfono real: `flutter run --dart-define=API_URL=http://192.168.1.7:4000`.
+- [ ] **Paso 6:** commit `feat(app): scaffold Flutter app with OSM map centered on the user's location`.
 
 ---
 
