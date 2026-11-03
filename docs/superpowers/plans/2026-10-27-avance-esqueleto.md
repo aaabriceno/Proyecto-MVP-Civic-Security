@@ -254,6 +254,8 @@ app/                                             generado por flutter create (so
 
 ### Tarea 8: Modelo, repositorio y pines desde el snapshot
 
+> **Hecha (2026-11-03), siguiendo el frame 05 de Figma:** pines por **tipo** (color e ícono del diseño; el estado se ve en la hoja y el detalle), chips de filtro, hoja "N incidentes en esta zona" con hora y distancia, y detalle provisional. Se pide el snapshot del **área visible** con una espera de 500 ms. Se quitó el pin central del mapa de inicio (solo aparece en 06c, Tarea 9). `API_URL` exige https en release. Pendiente de Figma: buscador, avatar, zonas de calor (05b), barra Mapa/Alertas/Perfil.
+
 **Por qué:** conecta la app con el backend y fija la separación por capas: `domain` (qué es un incidente), `data` (cómo se obtiene) y `presentation` (cómo se ve).
 
 **Archivos:**

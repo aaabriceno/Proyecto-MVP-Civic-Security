@@ -3,6 +3,9 @@ import 'dart:convert';
 
 import 'package:civic_security/core/geo/arequipa.dart';
 import 'package:civic_security/core/location/location_service.dart';
+import 'package:civic_security/core/network/api_failure.dart';
+import 'package:civic_security/features/incident/data/incident_repository.dart';
+import 'package:civic_security/features/incident/domain/incident.dart';
 import 'package:civic_security/features/map/presentation/map_providers.dart';
 import 'package:civic_security/features/map/presentation/map_screen.dart';
 import 'package:flutter/material.dart';
@@ -58,15 +61,53 @@ class _FakeLocationService implements LocationService {
   Future<void> openSettingsFor(LocationFailure reason) async => settingsCalls++;
 }
 
+/// Repositorio falso: devuelve [incidents], o lanza [failure] si se indica.
+class _FakeRepo implements IncidentRepository {
+  _FakeRepo({this.incidents = const [], this.failure});
+
+  List<Incident> incidents;
+  ApiFailure? failure;
+  final calls = <Bbox>[];
+
+  @override
+  Future<List<Incident>> fetchSnapshot(Bbox bbox) async {
+    calls.add(bbox);
+    if (failure != null) throw failure!;
+    return incidents;
+  }
+}
+
+Incident _incident(
+  String id, {
+  IncidentType tipo = IncidentType.robo,
+  IncidentStatus estado = IncidentStatus.sinVerificar,
+  LatLng position = const LatLng(-16.4295, -71.5050), // ~55 m de _enArequipa
+  String? descripcion,
+}) => Incident(
+  id: id,
+  tipo: tipo,
+  descripcion: descripcion,
+  position: position,
+  estado: estado,
+  creadoEn: DateTime.now().toUtc().subtract(const Duration(minutes: 12)),
+);
+
 Future<MapController> _pumpMap(
   WidgetTester tester,
-  _FakeLocationService service,
-) async {
+  _FakeLocationService service, {
+  _FakeRepo? repo,
+}) async {
+  // Pantalla alta (la fuente de los tests es más ancha que la real)
+  tester.view.physicalSize = const Size(1000, 1600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+
   final controller = MapController();
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         locationServiceProvider.overrideWithValue(service),
+        incidentRepositoryProvider.overrideWithValue(repo ?? _FakeRepo()),
         tileProviderProvider.overrideWithValue(_BlankTileProvider()),
       ],
       child: MaterialApp(home: MapScreen(mapController: controller)),
@@ -74,11 +115,16 @@ Future<MapController> _pumpMap(
   );
   await tester.pump();
   await tester.pump();
+  // El mapa espera 500 ms sin moverse antes de pedir los incidentes
+  await tester.pump(const Duration(milliseconds: 600));
+  await tester.pump();
   return controller;
 }
 
 void main() {
-  testWidgets('muestra el mapa y el pin central', (tester) async {
+  testWidgets('muestra el mapa, sin pin central (ese es solo del reporte)', (
+    tester,
+  ) async {
     await _pumpMap(
       tester,
       _FakeLocationService(
@@ -87,7 +133,7 @@ void main() {
     );
 
     expect(find.byType(FlutterMap), findsOneWidget);
-    expect(find.byKey(const Key('pin-central')), findsOneWidget);
+    expect(find.byKey(const Key('pin-central')), findsNothing);
   });
 
   testWidgets('con ubicación válida se centra en el usuario, sin aviso', (
@@ -209,6 +255,153 @@ void main() {
       controller.camera.center.latitude,
       closeTo(_enArequipa.latitude, 1e-6),
     );
+  });
+
+  group('incidentes en el mapa', () {
+    final enZona = [
+      _incident('a', tipo: IncidentType.robo),
+      _incident(
+        'b',
+        tipo: IncidentType.peleaColegio,
+        estado: IncidentStatus.verificado,
+        position: const LatLng(-16.4298, -71.5052),
+        descripcion: 'Pelea entre alumnos',
+      ),
+    ];
+
+    _FakeLocationService conUsuario() =>
+        _FakeLocationService(const LocationFound(_enArequipa));
+
+    testWidgets('pide al servidor los incidentes del área visible', (
+      tester,
+    ) async {
+      final repo = _FakeRepo(incidents: enZona);
+      await _pumpMap(tester, conUsuario(), repo: repo);
+
+      expect(repo.calls, isNotEmpty);
+      final bbox = repo.calls.last;
+      expect(bbox.minLat, lessThan(_enArequipa.latitude));
+      expect(bbox.maxLat, greaterThan(_enArequipa.latitude));
+      expect(bbox.minLng, lessThan(_enArequipa.longitude));
+      expect(bbox.maxLng, greaterThan(_enArequipa.longitude));
+      // Zoom 16: el área pedida es pequeña, no toda Arequipa
+      expect(bbox.maxLat - bbox.minLat, lessThan(0.05));
+    });
+
+    testWidgets('dibuja un pin por incidente', (tester) async {
+      await _pumpMap(tester, conUsuario(), repo: _FakeRepo(incidents: enZona));
+
+      expect(find.byKey(const Key('pin-a')), findsOneWidget);
+      expect(find.byKey(const Key('pin-b')), findsOneWidget);
+    });
+
+    testWidgets('la hoja inferior cuenta y lista los incidentes', (
+      tester,
+    ) async {
+      await _pumpMap(tester, conUsuario(), repo: _FakeRepo(incidents: enZona));
+
+      expect(find.text('2 incidentes en esta zona'), findsOneWidget);
+      expect(find.text('Robo'), findsWidgets);
+      expect(find.textContaining('Hace 12 min'), findsWidgets);
+      expect(find.textContaining('m de ti'), findsWidgets);
+      expect(find.text('Verificado'), findsWidgets);
+    });
+
+    testWidgets('sin incidentes lo dice claramente', (tester) async {
+      await _pumpMap(tester, conUsuario(), repo: _FakeRepo());
+      expect(find.text('Sin reportes en esta zona'), findsOneWidget);
+    });
+
+    testWidgets('un incidente se cuenta en singular', (tester) async {
+      await _pumpMap(
+        tester,
+        conUsuario(),
+        repo: _FakeRepo(incidents: [_incident('a')]),
+      );
+      expect(find.text('1 incidente en esta zona'), findsOneWidget);
+    });
+
+    testWidgets('filtrar por tipo oculta los demás pines y la lista', (
+      tester,
+    ) async {
+      await _pumpMap(tester, conUsuario(), repo: _FakeRepo(incidents: enZona));
+
+      await tester.tap(find.byKey(const Key('filtro-robo')));
+      await tester.pump();
+
+      expect(find.byKey(const Key('pin-a')), findsOneWidget);
+      expect(find.byKey(const Key('pin-b')), findsNothing);
+      expect(find.text('1 incidente en esta zona'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('filtro-todos')));
+      await tester.pump();
+      expect(find.byKey(const Key('pin-b')), findsOneWidget);
+    });
+
+    testWidgets(
+      'un error de red avisa, conserva el mapa y permite reintentar',
+      (tester) async {
+        final repo = _FakeRepo(failure: const ApiFailure.network());
+        await _pumpMap(tester, conUsuario(), repo: repo);
+
+        expect(find.byKey(const Key('aviso-datos')), findsOneWidget);
+        expect(
+          find.text('No se pudo conectar con el servidor'),
+          findsOneWidget,
+        );
+        expect(find.byType(FlutterMap), findsOneWidget);
+
+        // El servidor vuelve: Reintentar carga los incidentes y quita el aviso
+        repo
+          ..failure = null
+          ..incidents = enZona;
+        await tester.tap(find.byKey(const Key('reintentar-datos')));
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byKey(const Key('aviso-datos')), findsNothing);
+        expect(find.byKey(const Key('pin-a')), findsOneWidget);
+      },
+    );
+
+    testWidgets('tocar un pin muestra el detalle del incidente', (
+      tester,
+    ) async {
+      await _pumpMap(tester, conUsuario(), repo: _FakeRepo(incidents: enZona));
+
+      await tester.tap(find.byKey(const Key('pin-b')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('detalle-incidente')), findsOneWidget);
+      expect(find.text('Pelea entre alumnos'), findsOneWidget);
+      expect(find.text('Pelea en salida de colegio'), findsWidgets);
+    });
+
+    testWidgets('el detalle de un incidente sin descripción lo indica', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        conUsuario(),
+        repo: _FakeRepo(incidents: [_incident('a')]),
+      );
+
+      await tester.tap(find.byKey(const Key('pin-a')));
+      await tester.pumpAndSettle();
+      expect(find.text('Sin descripción'), findsOneWidget);
+    });
+
+    testWidgets('sin ubicación del usuario no inventa distancias', (
+      tester,
+    ) async {
+      final service = _FakeLocationService(
+        const LocationUnavailable(LocationFailure.denied),
+      );
+      await _pumpMap(tester, service, repo: _FakeRepo(incidents: enZona));
+
+      expect(find.text('2 incidentes en esta zona'), findsOneWidget);
+      expect(find.textContaining('m de ti'), findsNothing);
+    });
   });
 
   test('arequipaBounds reconoce puntos dentro y fuera', () {

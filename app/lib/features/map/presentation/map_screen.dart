@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,9 +7,20 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/geo/arequipa.dart';
 import '../../../core/location/location_service.dart';
+import '../../incident/domain/incident.dart';
+import 'incident_detail.dart';
+import 'incident_pin.dart';
+import 'incidents_sheet.dart';
+import 'map_incidents_controller.dart';
 import 'map_providers.dart';
+import 'type_filter_bar.dart';
 
 const _zoomInicial = 16.0;
+const _extentInicialHoja = 0.25;
+
+/// Tiempo que el mapa espera sin moverse antes de pedir los incidentes del
+/// área visible (evita una consulta por cada fotograma al arrastrar).
+const _esperaAntesDeCargar = Duration(milliseconds: 500);
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key, this.mapController});
@@ -27,6 +40,10 @@ class _MapScreenState extends ConsumerState<MapScreen>
   bool _mapReady = false;
   bool _centeredOnUser = false;
   LatLng? _pendingTarget;
+  Timer? _loadTimer;
+
+  // Para que el botón de ubicación suba junto con la hoja inferior
+  final _sheetExtent = ValueNotifier<double>(_extentInicialHoja);
 
   @override
   void initState() {
@@ -37,6 +54,8 @@ class _MapScreenState extends ConsumerState<MapScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _loadTimer?.cancel();
+    _sheetExtent.dispose();
     if (widget.mapController == null) _controller.dispose();
     super.dispose();
   }
@@ -66,6 +85,27 @@ class _MapScreenState extends ConsumerState<MapScreen>
       _pendingTarget = null;
       _controller.move(target, _zoomInicial);
     }
+    _scheduleLoad();
+  }
+
+  void _scheduleLoad() {
+    _loadTimer?.cancel();
+    _loadTimer = Timer(_esperaAntesDeCargar, _loadVisibleArea);
+  }
+
+  void _loadVisibleArea() {
+    if (!mounted || !_mapReady) return;
+    final b = _controller.camera.visibleBounds;
+    ref
+        .read(mapIncidentsProvider.notifier)
+        .load(
+          Bbox.fromCorners(
+            south: b.south,
+            west: b.west,
+            north: b.north,
+            east: b.east,
+          ),
+        );
   }
 
   @override
@@ -80,7 +120,14 @@ class _MapScreenState extends ConsumerState<MapScreen>
     });
 
     final location = ref.watch(userLocationProvider);
-    final state = location.value;
+    final locationState = location.value;
+    final userPosition = locationState is LocationFound
+        ? locationState.position
+        : null;
+
+    final data = ref.watch(mapIncidentsProvider);
+    final incidents = ref.watch(visibleIncidentsProvider);
+    final filter = ref.watch(typeFilterProvider);
 
     return Scaffold(
       body: Stack(
@@ -96,6 +143,9 @@ class _MapScreenState extends ConsumerState<MapScreen>
               minZoom: 10,
               maxZoom: 19,
               onMapReady: _onMapReady,
+              onPositionChanged: (_, _) {
+                if (_mapReady) _scheduleLoad();
+              },
             ),
             children: [
               TileLayer(
@@ -103,57 +153,107 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 userAgentPackageName: 'pe.civicsecurity.civic_security',
                 tileProvider: ref.watch(tileProviderProvider),
               ),
-              if (state is LocationFound)
+              if (userPosition != null)
                 MarkerLayer(
                   markers: [
                     Marker(
-                      point: state.position,
+                      point: userPosition,
                       width: 22,
                       height: 22,
                       child: const _UserDot(),
                     ),
                   ],
                 ),
+              MarkerLayer(
+                markers: [
+                  for (final incident in incidents)
+                    Marker(
+                      point: incident.position,
+                      width: 44,
+                      height: 44,
+                      child: IncidentPin(
+                        key: Key('pin-${incident.id}'),
+                        incident: incident,
+                        onTap: () => showIncidentDetail(
+                          context,
+                          incident,
+                          userPosition: userPosition,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               const SimpleAttributionWidget(
                 source: Text('OpenStreetMap contributors'),
               ),
             ],
           ),
-          // Pin fijo al centro: marca dónde se ubicará el reporte (Tarea 9)
-          const IgnorePointer(child: Center(child: _CenterPin())),
           SafeArea(
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: _statusBanner(location),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TypeFilterBar(
+                    selected: filter,
+                    onSelected: ref.read(typeFilterProvider.notifier).select,
+                  ),
+                  _locationBanner(location),
+                  _dataBanner(data),
+                ],
               ),
             ),
           ),
+          NotificationListener<DraggableScrollableNotification>(
+            onNotification: (n) {
+              _sheetExtent.value = n.extent;
+              return false;
+            },
+            child: IncidentsSheet(
+              incidents: incidents,
+              loading: data.loading,
+              userPosition: userPosition,
+              initialExtent: _extentInicialHoja,
+              onSelect: (incident) => showIncidentDetail(
+                context,
+                incident,
+                userPosition: userPosition,
+              ),
+            ),
+          ),
+          ValueListenableBuilder<double>(
+            valueListenable: _sheetExtent,
+            builder: (context, extent, _) {
+              final height = MediaQuery.sizeOf(context).height;
+              return Positioned(
+                right: 16,
+                // Sube con la hoja, pero se queda en pantalla si se expande
+                bottom: height * extent.clamp(0.0, 0.5) + 16,
+                child: FloatingActionButton(
+                  key: const Key('boton-mi-ubicacion'),
+                  tooltip: 'Mi ubicación',
+                  onPressed: () {
+                    if (userPosition != null) {
+                      _controller.move(userPosition, _zoomInicial);
+                    } else {
+                      ref.invalidate(userLocationProvider);
+                    }
+                  },
+                  child: const Icon(Icons.my_location),
+                ),
+              );
+            },
+          ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        key: const Key('boton-mi-ubicacion'),
-        tooltip: 'Mi ubicación',
-        onPressed: () {
-          if (state is LocationFound) {
-            _controller.move(state.position, _zoomInicial);
-          } else {
-            ref.invalidate(userLocationProvider);
-          }
-        },
-        child: const Icon(Icons.my_location),
       ),
     );
   }
 
-  Widget _statusBanner(AsyncValue<LocationState> location) {
+  Widget _locationBanner(AsyncValue<LocationState> location) {
     if (location.isLoading) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Text('Buscando tu ubicación…'),
-        ),
+      return const _Banner(
+        key: Key('buscando-ubicacion'),
+        message: 'Buscando tu ubicación…',
       );
     }
     final state = location.value;
@@ -163,24 +263,26 @@ class _MapScreenState extends ConsumerState<MapScreen>
         state.reason == LocationFailure.serviceDisabled ||
         state.reason == LocationFailure.deniedForever;
 
-    return Card(
+    return _Banner(
       key: const Key('aviso-ubicacion'),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        child: Row(
-          children: [
-            Expanded(child: Text(_messageFor(state.reason))),
-            TextButton(
-              onPressed: () => needsSettings
-                  ? ref
-                        .read(locationServiceProvider)
-                        .openSettingsFor(state.reason)
-                  : ref.invalidate(userLocationProvider),
-              child: Text(needsSettings ? 'Ajustes' : 'Reintentar'),
-            ),
-          ],
-        ),
-      ),
+      message: _messageFor(state.reason),
+      actionLabel: needsSettings ? 'Ajustes' : 'Reintentar',
+      onAction: () => needsSettings
+          ? ref.read(locationServiceProvider).openSettingsFor(state.reason)
+          : ref.invalidate(userLocationProvider),
+    );
+  }
+
+  Widget _dataBanner(MapIncidentsState data) {
+    final failure = data.failure;
+    if (failure == null) return const SizedBox.shrink();
+
+    return _Banner(
+      key: const Key('aviso-datos'),
+      message: failure.message,
+      actionKey: const Key('reintentar-datos'),
+      actionLabel: 'Reintentar',
+      onAction: () => ref.read(mapIncidentsProvider.notifier).retry(),
     );
   }
 
@@ -198,6 +300,42 @@ class _MapScreenState extends ConsumerState<MapScreen>
   };
 }
 
+class _Banner extends StatelessWidget {
+  const _Banner({
+    super.key,
+    required this.message,
+    this.actionLabel,
+    this.actionKey,
+    this.onAction,
+  });
+
+  final String message;
+  final String? actionLabel;
+  final Key? actionKey;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+        child: Row(
+          children: [
+            Expanded(child: Text(message)),
+            if (actionLabel != null)
+              TextButton(
+                key: actionKey,
+                onPressed: onAction,
+                child: Text(actionLabel!),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _UserDot extends StatelessWidget {
   const _UserDot();
 
@@ -210,24 +348,6 @@ class _UserDot extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 3),
         boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black38)],
-      ),
-    );
-  }
-}
-
-class _CenterPin extends StatelessWidget {
-  const _CenterPin();
-
-  @override
-  Widget build(BuildContext context) {
-    // La punta del pin queda exactamente en el centro del mapa
-    return Transform.translate(
-      offset: const Offset(0, -22),
-      child: const Icon(
-        Icons.location_pin,
-        key: Key('pin-central'),
-        size: 44,
-        color: Colors.red,
       ),
     );
   }
