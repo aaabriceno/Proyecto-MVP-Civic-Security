@@ -15,5 +15,6 @@ defmodule CivicWeb.Router do
     pipe_through :api
 
     post "/incidents", IncidentController, :create
+    get "/map/snapshot", MapController, :snapshot
   end
 end

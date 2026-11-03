@@ -20,6 +20,17 @@ defmodule CivicWeb.FallbackController do
     })
   end
 
+  def call(conn, {:error, :invalid_bbox}) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{
+      error: %{
+        code: "invalid_bbox",
+        message: "bbox debe ser minLng,minLat,maxLng,maxLat (números, min menor que max)"
+      }
+    })
+  end
+
   def call(conn, {:error, %Ecto.Changeset{} = changeset}) do
     fields =
       Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
