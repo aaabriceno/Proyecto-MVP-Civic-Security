@@ -36,7 +36,7 @@
 | Tópicos `celda:<geohash6>` | Un solo tópico `mapa:arequipa` | Iteración 3 |
 | `riverpod_generator` + `freezed` | Riverpod sin generación de código; `fromJson` escrito a mano (más fácil de entender) | Cuando el equipo domine lo básico |
 | `go_router` | `Navigator.push` | Iteración 3 (deep links desde push) |
-| GPS actual o pin | Solo pin fijo al centro (sin pedir permisos) | Iteración 1 |
+| GPS actual o pin | **Actualizado en la Tarea 7:** el mapa se centra en la ubicación del usuario (permiso en primer plano, punto azul que lo sigue); la UCSP es solo el centro de respaldo si no hay permiso, GPS o si está fuera de Arequipa. El pin central fijo se mantiene para ubicar el reporte | Tarea 9 usa el pin; ubicación en segundo plano, nunca |
 | Rate limit, auth, `boundary` | Ninguno (el backend corre solo en la red local) | Iteraciones 1 y 5 |
 
 ## Foco de revisión
