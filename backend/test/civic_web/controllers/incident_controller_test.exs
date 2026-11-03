@@ -72,4 +72,40 @@ defmodule CivicWeb.IncidentControllerTest do
     refute Map.has_key?(data, "ubicacion")
     refute Map.has_key?(data, "idempotency_key")
   end
+
+  describe "tiempo real" do
+    test "un reporte nuevo se emite en mapa:arequipa", %{conn: conn} do
+      CivicWeb.Endpoint.subscribe("mapa:arequipa")
+
+      conn = post_incident(conn, @valid, Ecto.UUID.generate())
+      %{"id" => id} = json_response(conn, 201)["data"]
+
+      assert_receive %Phoenix.Socket.Broadcast{
+        topic: "mapa:arequipa",
+        event: "incidente_nuevo",
+        payload: %{id: ^id, tipo: :robo, estado: :sin_verificar}
+      }
+    end
+
+    test "repetir la misma idempotency-key no vuelve a emitir", %{conn: conn} do
+      key = Ecto.UUID.generate()
+      post_incident(conn, @valid, key)
+
+      CivicWeb.Endpoint.subscribe("mapa:arequipa")
+      conn = post_incident(build_conn(), @valid, key)
+
+      assert json_response(conn, 200)
+      refute_receive %Phoenix.Socket.Broadcast{}
+    end
+
+    test "un reporte rechazado no se emite", %{conn: conn} do
+      CivicWeb.Endpoint.subscribe("mapa:arequipa")
+
+      conn =
+        post_incident(conn, %{@valid | "lat" => -12.05, "lng" => -77.04}, Ecto.UUID.generate())
+
+      assert json_response(conn, 422)
+      refute_receive %Phoenix.Socket.Broadcast{}
+    end
+  end
 end

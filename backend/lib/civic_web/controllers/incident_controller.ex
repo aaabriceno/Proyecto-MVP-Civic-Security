@@ -8,11 +8,23 @@ defmodule CivicWeb.IncidentController do
   def create(conn, params) do
     with {:ok, key} <- idempotency_key(conn),
          {:ok, outcome, incident} <- Incidents.create_incident(params, key) do
+      if outcome == :created, do: broadcast_new(incident)
+
       conn
       |> put_status(status_for(outcome))
       |> put_view(json: CivicWeb.IncidentJSON)
       |> render(:show, incident: incident)
     end
+  end
+
+  # Se emite desde la capa web para que el dominio (Civic.*) no dependa de ella.
+  # Solo para reportes nuevos: repetir la idempotency-key no vuelve a emitir.
+  defp broadcast_new(incident) do
+    CivicWeb.Endpoint.broadcast!(
+      "mapa:arequipa",
+      "incidente_nuevo",
+      CivicWeb.IncidentJSON.data(incident)
+    )
   end
 
   defp status_for(:created), do: :created
