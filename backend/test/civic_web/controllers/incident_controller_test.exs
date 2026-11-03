@@ -73,6 +73,22 @@ defmodule CivicWeb.IncidentControllerTest do
     refute Map.has_key?(data, "idempotency_key")
   end
 
+  test "una descripción con SQL se guarda como texto inofensivo", %{conn: conn} do
+    sql = "'); DROP TABLE incidentes; --"
+    conn = post_incident(conn, %{@valid | "descripcion" => sql}, Ecto.UUID.generate())
+
+    assert json_response(conn, 201)["data"]["descripcion"] == sql
+    assert Civic.Repo.aggregate(Civic.Incidents.Incident, :count) == 1
+  end
+
+  test "409 si la misma idempotency-key llega con otro contenido", %{conn: conn} do
+    key = Ecto.UUID.generate()
+    assert conn |> post_incident(@valid, key) |> json_response(201)
+
+    conn = post_incident(build_conn(), %{@valid | "tipo" => "pelea_colegio"}, key)
+    assert %{"error" => %{"code" => "idempotency_key_conflict"}} = json_response(conn, 409)
+  end
+
   describe "tiempo real" do
     test "un reporte nuevo se emite en mapa:arequipa", %{conn: conn} do
       CivicWeb.Endpoint.subscribe("mapa:arequipa")

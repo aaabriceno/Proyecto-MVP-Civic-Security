@@ -19,8 +19,9 @@ config :civic, Civic.Repo,
 config :civic, CivicWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {0, 0, 0, 0}],
-  check_origin: false,
+  # Solo esta laptop. Para probar con un teléfono por Wi-Fi: CIVIC_LAN=1 mix phx.server
+  # (mejor aún: `adb reverse tcp:4000 tcp:4000` con el teléfono por USB).
+  http: [ip: if(System.get_env("CIVIC_LAN") == "1", do: {0, 0, 0, 0}, else: {127, 0, 0, 1})],
   code_reloader: true,
   debug_errors: true,
   secret_key_base: "WMyJw5N2s/z9AufHup+F39BsqO9FMDpSeFDwyo35KzvldzAf2kDd5GLb1TLFl1Lp",

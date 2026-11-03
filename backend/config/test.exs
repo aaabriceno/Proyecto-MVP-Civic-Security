@@ -29,3 +29,9 @@ config :phoenix, :plug_init_mode, :runtime
 # Sort query params output of verified routes for robust url comparisons
 config :phoenix,
   sort_verified_routes_query_params: true
+
+# Límites muy altos: solo los tests de rate limiting los reducen a propósito
+config :civic, CivicWeb.RateLimit,
+  write: {100_000, :timer.minutes(1)},
+  read: {100_000, :timer.minutes(1)},
+  socket: {100_000, :timer.minutes(1)}

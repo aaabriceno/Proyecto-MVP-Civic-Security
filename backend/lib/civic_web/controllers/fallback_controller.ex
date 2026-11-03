@@ -20,6 +20,17 @@ defmodule CivicWeb.FallbackController do
     })
   end
 
+  def call(conn, {:error, :idempotency_conflict}) do
+    conn
+    |> put_status(:conflict)
+    |> json(%{
+      error: %{
+        code: "idempotency_key_conflict",
+        message: "Esa idempotency-key ya se usó con otro contenido; genera una nueva"
+      }
+    })
+  end
+
   def call(conn, {:error, :invalid_bbox}) do
     conn
     |> put_status(:bad_request)

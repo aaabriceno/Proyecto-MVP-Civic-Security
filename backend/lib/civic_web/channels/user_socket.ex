@@ -9,8 +9,14 @@ defmodule CivicWeb.UserSocket do
 
   channel "mapa:*", CivicWeb.MapaChannel
 
+  # Limita cuántas conexiones por minuto puede abrir cada cliente
   @impl true
-  def connect(_params, socket, _connect_info), do: {:ok, socket}
+  def connect(_params, socket, connect_info) do
+    case Civic.RateLimit.check(:socket, CivicWeb.ClientIP.from_connect_info(connect_info)) do
+      :ok -> {:ok, socket}
+      {:deny, _retry_ms} -> :error
+    end
+  end
 
   @impl true
   def id(_socket), do: nil

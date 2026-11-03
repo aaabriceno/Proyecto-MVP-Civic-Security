@@ -36,4 +36,11 @@ defmodule CivicWeb.MapControllerTest do
     conn = get(conn, ~p"/v1/map/snapshot?bbox=hola")
     assert %{"error" => %{"code" => "invalid_bbox"}} = json_response(conn, 400)
   end
+
+  test "400 con SQL en el bbox, sin tocar la base de datos", %{conn: conn} do
+    bbox = URI.encode_www_form("-71.5,-16.4,-71.4,-16.3); DROP TABLE incidentes; --")
+    conn = get(conn, "/v1/map/snapshot?bbox=#{bbox}")
+
+    assert %{"error" => %{"code" => "invalid_bbox"}} = json_response(conn, 400)
+  end
 end

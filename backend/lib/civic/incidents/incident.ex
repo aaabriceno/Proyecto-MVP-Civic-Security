@@ -10,6 +10,11 @@ defmodule Civic.Incidents.Incident do
   @lng_min -71.75
   @lng_max -71.40
 
+  # Caracteres de control (salvo \t, \n y \r) y marcas de dirección de texto
+  # (U+202A–202E, U+2066–2069): permiten ocultar o invertir lo que se lee, y el
+  # byte NUL hace fallar a PostgreSQL.
+  @texto_prohibido ~r/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x{202A}-\x{202E}\x{2066}-\x{2069}]/u
+
   @primary_key {:id, :binary_id, autogenerate: true}
   @timestamps_opts [type: :utc_datetime_usec]
 
@@ -36,12 +41,28 @@ defmodule Civic.Incidents.Incident do
     |> validate_required([:tipo, :lat, :lng])
     |> update_change(:descripcion, &trim_or_nil/1)
     |> validate_length(:descripcion, max: 500)
+    |> validate_texto_seguro(:descripcion)
     |> validate_arequipa()
     |> put_ubicacion()
     |> unique_constraint(:idempotency_key)
   end
 
+  @doc "¿El contenido propuesto en `changeset` es el mismo que el de `incident`?"
+  def same_content?(%__MODULE__{} = incident, %Ecto.Changeset{} = changeset) do
+    incident.tipo == get_field(changeset, :tipo) and
+      incident.descripcion == get_field(changeset, :descripcion) and
+      coords(incident) == {get_field(changeset, :lat), get_field(changeset, :lng)}
+  end
+
   def coords(%__MODULE__{ubicacion: %Geo.Point{coordinates: {lng, lat}}}), do: {lat, lng}
+
+  defp validate_texto_seguro(changeset, field) do
+    validate_change(changeset, field, fn _, texto ->
+      if Regex.match?(@texto_prohibido, texto),
+        do: [{field, "contiene caracteres no permitidos"}],
+        else: []
+    end)
+  end
 
   defp trim_or_nil(texto) do
     case String.trim(texto) do

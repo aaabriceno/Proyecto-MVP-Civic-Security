@@ -10,10 +10,29 @@ defmodule Civic.Incidents do
 
   @max_resultados 500
 
+  @doc """
+  Crea un incidente. `idempotency_key` evita duplicados cuando la app reintenta
+  el envío:
+
+    * clave nueva -> `{:ok, :created, incidente}`
+    * clave repetida con el **mismo** contenido -> `{:ok, :existing, incidente}`
+    * clave repetida con **otro** contenido -> `{:error, :idempotency_conflict}`
+      (si no, el reporte nuevo se perdería en silencio)
+  """
   def create_incident(attrs, idempotency_key) do
     case Repo.get_by(Incident, idempotency_key: idempotency_key) do
-      %Incident{} = existente -> {:ok, :existing, existente}
+      %Incident{} = existente -> replay(existente, attrs)
       nil -> insertar(attrs, idempotency_key)
+    end
+  end
+
+  defp replay(existente, attrs) do
+    changeset = Incident.create_changeset(%Incident{}, attrs)
+
+    cond do
+      not changeset.valid? -> {:error, %{changeset | action: :insert}}
+      Incident.same_content?(existente, changeset) -> {:ok, :existing, existente}
+      true -> {:error, :idempotency_conflict}
     end
   end
 
@@ -47,14 +66,14 @@ defmodule Civic.Incidents do
     |> Repo.insert()
     |> case do
       {:ok, incident} -> {:ok, :created, incident}
-      {:error, changeset} -> manejar_error(changeset, idempotency_key)
+      {:error, changeset} -> manejar_error(changeset, attrs, idempotency_key)
     end
   end
 
-  # Si otra petición con la misma key ganó la carrera, devolvemos la suya
-  defp manejar_error(changeset, idempotency_key) do
+  # Si otra petición con la misma key ganó la carrera, se trata como repetición
+  defp manejar_error(changeset, attrs, idempotency_key) do
     if Keyword.has_key?(changeset.errors, :idempotency_key) do
-      {:ok, :existing, Repo.get_by!(Incident, idempotency_key: idempotency_key)}
+      replay(Repo.get_by!(Incident, idempotency_key: idempotency_key), attrs)
     else
       {:error, changeset}
     end

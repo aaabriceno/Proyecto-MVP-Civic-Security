@@ -54,6 +54,10 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
+  # Solo si hay un proxy que SOBRESCRIBE esta cabecera (p. ej. fly-client-ip en
+  # Fly.io). Sin ella, todos los clientes compartirían la IP del proxy.
+  config :civic, :client_ip_header, System.get_env("CLIENT_IP_HEADER")
+
   config :civic, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :civic, CivicWeb.Endpoint,

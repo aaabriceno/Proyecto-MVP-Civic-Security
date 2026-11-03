@@ -53,6 +53,40 @@ defmodule Civic.IncidentsTest do
       assert %{descripcion: [_]} = errors_on(cs)
     end
 
+    test "rechaza caracteres de control y de dirección de texto en la descripción" do
+      peligrosos = [
+        "a\u0000b",
+        "alarma\u0007",
+        "texto \u202Eoculto",
+        "texto \u2066aislado\u2069"
+      ]
+
+      for texto <- peligrosos do
+        attrs = %{@valid | "descripcion" => texto}
+        assert {:error, cs} = Incidents.create_incident(attrs, key())
+        assert errors_on(cs).descripcion == ["contiene caracteres no permitidos"]
+      end
+    end
+
+    test "permite saltos de línea y tildes en la descripción" do
+      attrs = %{@valid | "descripcion" => "Línea 1\nLínea 2\tcon ñ y ¿qué?"}
+      assert {:ok, :created, inc} = Incidents.create_incident(attrs, key())
+      assert inc.descripcion == "Línea 1\nLínea 2\tcon ñ y ¿qué?"
+    end
+
+    test "la misma idempotency_key con otro contenido es un conflicto" do
+      k = key()
+      assert {:ok, :created, _} = Incidents.create_incident(@valid, k)
+
+      assert {:error, :idempotency_conflict} =
+               Incidents.create_incident(%{@valid | "tipo" => "pelea_colegio"}, k)
+
+      assert {:error, :idempotency_conflict} =
+               Incidents.create_incident(%{@valid | "lat" => -16.40}, k)
+
+      assert Repo.aggregate(Incident, :count) == 1
+    end
+
     test "misma idempotency_key devuelve el mismo incidente" do
       k = key()
       assert {:ok, :created, inc1} = Incidents.create_incident(@valid, k)

@@ -3,7 +3,8 @@
 #     mix run priv/repo/demo_mapa.exs
 #
 # Escribe Avances-MVP/avance-1/mapa-demo.html. Necesita internet para cargar
-# Leaflet y los mapas de OpenStreetMap.
+# Leaflet y los mapas de OpenStreetMap. Los scripts llevan hash de integridad
+# (SRI): si el CDN sirviera un archivo distinto, el navegador lo rechaza.
 
 alias Civic.Repo
 alias Civic.Incidents.Incident
@@ -36,9 +37,12 @@ html = """
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Civic Security - Mapa de incidentes (datos ficticios)</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"
+        integrity="sha384-mFKkGiGvT5vo1fEyGCD3hshDdKmW3wzXW/x+fWriYJArD0R3gawT6lMvLboM22c0" crossorigin="anonymous"></script>
 <style>
   html, body, #mapa { height: 100%; margin: 0; font-family: sans-serif; }
   .panel { background: white; padding: 8px 12px; border-radius: 6px;
