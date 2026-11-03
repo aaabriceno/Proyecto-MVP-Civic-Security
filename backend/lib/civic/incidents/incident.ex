@@ -15,6 +15,16 @@ defmodule Civic.Incidents.Incident do
   # byte NUL hace fallar a PostgreSQL.
   @texto_prohibido ~r/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x{202A}-\x{202E}\x{2066}-\x{2069}]/u
 
+  # Civic Security es anónimo: nadie debería escribir datos de una persona
+  # (DNI, teléfono, correo, enlaces) en un reporte. Es un filtro de lo más común,
+  # no una garantía: el aviso en la pantalla de reporte hace el resto.
+  @email ~r/[^\s@]+@[^\s@]+\.[^\s@]+/u
+  @enlace ~r/https?:\/\/|www\./iu
+  @entre_digitos ~r/(?<=\d)[\s.\-](?=\d)/
+  @dni ~r/(?<!\d)\d{8}(?!\d)/
+  # Celular peruano: 9 dígitos que empiezan con 9, con o sin el prefijo 51
+  @celular ~r/(?<!\d)(?:51)?9\d{8}(?!\d)/
+
   @primary_key {:id, :binary_id, autogenerate: true}
   @timestamps_opts [type: :utc_datetime_usec]
 
@@ -42,6 +52,7 @@ defmodule Civic.Incidents.Incident do
     |> update_change(:descripcion, &trim_or_nil/1)
     |> validate_length(:descripcion, max: 500)
     |> validate_texto_seguro(:descripcion)
+    |> validate_sin_datos_personales(:descripcion)
     |> validate_arequipa()
     |> put_ubicacion()
     |> unique_constraint(:idempotency_key)
@@ -62,6 +73,22 @@ defmodule Civic.Incidents.Incident do
         do: [{field, "contiene caracteres no permitidos"}],
         else: []
     end)
+  end
+
+  defp validate_sin_datos_personales(changeset, field) do
+    validate_change(changeset, field, fn _, texto ->
+      if datos_personales?(texto),
+        do: [{field, "no escribas datos personales (DNI, teléfonos, correos ni enlaces)"}],
+        else: []
+    end)
+  end
+
+  defp datos_personales?(texto) do
+    # "987 654 321" y "987-654-321" se juntan para detectarlos igual
+    digitos = Regex.replace(@entre_digitos, texto, "")
+
+    Regex.match?(@email, texto) or Regex.match?(@enlace, texto) or
+      Regex.match?(@dni, digitos) or Regex.match?(@celular, digitos)
   end
 
   defp trim_or_nil(texto) do

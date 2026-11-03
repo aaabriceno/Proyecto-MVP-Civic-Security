@@ -75,6 +75,45 @@ defmodule Civic.IncidentsTest do
       end
     end
 
+    test "rechaza datos personales en la descripción (DNI, teléfono, correo, enlaces)" do
+      con_datos = [
+        "El sujeto dijo que su DNI es 70123456",
+        "llamen al 987654321",
+        "su celular: 987 654 321",
+        "su celular: 987-654-321",
+        "mi número es +51 987 654 321",
+        "escríbeme a persona@correo.com",
+        "mira el video en https://ejemplo.com/video",
+        "más info en www.ejemplo.pe"
+      ]
+
+      for texto <- con_datos do
+        attrs = %{@valid | "descripcion" => texto}
+        assert {:error, cs} = Incidents.create_incident(attrs, key()), "debió rechazar: #{texto}"
+
+        assert errors_on(cs).descripcion ==
+                 ["no escribas datos personales (DNI, teléfonos, correos ni enlaces)"]
+      end
+    end
+
+    test "no confunde datos corrientes con datos personales" do
+      sin_datos = [
+        "Av. Ejército 710, dos sujetos en moto",
+        "Fue a las 23:45, eran 3 hombres y 2 motos",
+        "Robaron 1500 soles y 2 celulares en la cuadra 12",
+        "Placa ABC-123, huyeron hacia el puente",
+        "Ocurrió el 05/11/2026 alrededor de las 10",
+        "Calle 28 de Julio 1234, frente al banco"
+      ]
+
+      for texto <- sin_datos do
+        attrs = %{@valid | "descripcion" => texto}
+
+        assert {:ok, :created, _} = Incidents.create_incident(attrs, key()),
+               "no debió rechazar: #{texto}"
+      end
+    end
+
     test "permite saltos de línea y tildes en la descripción" do
       attrs = %{@valid | "descripcion" => "Línea 1\nLínea 2\tcon ñ y ¿qué?"}
       assert {:ok, :created, inc} = Incidents.create_incident(attrs, key())
