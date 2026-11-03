@@ -42,8 +42,8 @@ zonas = [
   {"Sachaca", -16.4250, -71.5650, 1},
   {"Socabaya", -16.4650, -71.5300, 1}
 ]
-# {zona, lat, lng, peso}: más peso = más reportes (simula zonas de mayor riesgo)
 
+# {zona, lat, lng, peso}: más peso = más reportes (simula zonas de mayor riesgo)
 
 descripciones = %{
   "robo" => [

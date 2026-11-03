@@ -11,7 +11,9 @@ defmodule CivicWeb.Router do
     get "/health", HealthController, :show
   end
 
-  scope "/api", CivicWeb do
+  scope "/v1", CivicWeb do
     pipe_through :api
+
+    post "/incidents", IncidentController, :create
   end
 end
