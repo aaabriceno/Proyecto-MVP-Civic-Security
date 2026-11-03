@@ -6,7 +6,8 @@ enum IncidentType {
   agresionMujer('agresion_mujer', 'Agresión a mujer'),
   maltratoAnimal('maltrato_animal', 'Maltrato animal'),
   peleaColegio('pelea_colegio', 'Pelea en salida de colegio'),
-  actividadSospechosa('actividad_sospechosa', 'Actividad sospechosa');
+  actividadSospechosa('actividad_sospechosa', 'Actividad sospechosa'),
+  otro('otro', 'Otro');
 
   const IncidentType(this.wire, this.label);
 

@@ -65,6 +65,7 @@ void main() {
         IncidentType.fromWire('actividad_sospechosa'),
         IncidentType.actividadSospechosa,
       );
+      expect(IncidentType.fromWire('otro'), IncidentType.otro);
       expect(IncidentType.fromWire('ovni'), isNull);
     });
 
@@ -74,6 +75,7 @@ void main() {
       expect(IncidentType.maltratoAnimal.label, 'Maltrato animal');
       expect(IncidentType.peleaColegio.label, 'Pelea en salida de colegio');
       expect(IncidentType.actividadSospechosa.label, 'Actividad sospechosa');
+      expect(IncidentType.otro.label, 'Otro');
     });
 
     test('wire y fromWire son inversos', () {

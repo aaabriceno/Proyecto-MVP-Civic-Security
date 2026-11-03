@@ -9,6 +9,7 @@ Color typeColor(IncidentType type) => switch (type) {
   IncidentType.maltratoAnimal => const Color(0xFFF2994A),
   IncidentType.peleaColegio => const Color(0xFF2F80ED),
   IncidentType.actividadSospechosa => const Color(0xFF6B7280),
+  IncidentType.otro => const Color(0xFF374151),
 };
 
 IconData typeIcon(IncidentType type) => switch (type) {
@@ -17,6 +18,7 @@ IconData typeIcon(IncidentType type) => switch (type) {
   IncidentType.maltratoAnimal => Icons.pets,
   IncidentType.peleaColegio => Icons.bolt,
   IncidentType.actividadSospechosa => Icons.question_mark,
+  IncidentType.otro => Icons.more_horiz,
 };
 
 /// Etiqueta corta para los chips de filtro.
@@ -26,6 +28,7 @@ String typeShortLabel(IncidentType type) => switch (type) {
   IncidentType.maltratoAnimal => 'Animales',
   IncidentType.peleaColegio => 'Pelea',
   IncidentType.actividadSospechosa => 'Sospechosa',
+  IncidentType.otro => 'Otro',
 };
 
 Color statusColor(IncidentStatus status) => switch (status) {

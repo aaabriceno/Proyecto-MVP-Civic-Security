@@ -57,7 +57,8 @@ html = """
   const COLORES = { verificado: "#2e7d32", sin_verificar: "#f57c00", descartado: "#9e9e9e" };
   const ETIQUETAS = {
     robo: "Robo", agresion_mujer: "Agresión a mujer", maltrato_animal: "Maltrato animal",
-    pelea_colegio: "Pelea en salida de colegio", actividad_sospechosa: "Actividad sospechosa"
+    pelea_colegio: "Pelea en salida de colegio", actividad_sospechosa: "Actividad sospechosa",
+    otro: "Otro"
   };
   const ESTADOS = { verificado: "Verificado", sin_verificar: "Sin verificar", descartado: "Descartado" };
 

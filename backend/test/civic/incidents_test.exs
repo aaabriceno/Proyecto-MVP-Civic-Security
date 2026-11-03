@@ -21,6 +21,13 @@ defmodule Civic.IncidentsTest do
       assert Incident.coords(inc) == {-16.3963, -71.5340}
     end
 
+    test "acepta los seis tipos, incluido otro" do
+      for tipo <- ~w(robo agresion_mujer maltrato_animal pelea_colegio actividad_sospechosa otro) do
+        assert {:ok, :created, inc} = Incidents.create_incident(%{@valid | "tipo" => tipo}, key())
+        assert Atom.to_string(inc.tipo) == tipo
+      end
+    end
+
     test "rechaza tipo desconocido" do
       attrs = %{@valid | "tipo" => "ovni"}
       assert {:error, cs} = Incidents.create_incident(attrs, key())

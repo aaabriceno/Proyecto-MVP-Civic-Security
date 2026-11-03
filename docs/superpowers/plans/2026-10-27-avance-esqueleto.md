@@ -17,7 +17,7 @@
 
 ## Restricciones globales
 
-- Tipos de incidente (valor en la API → etiqueta en la UI): `robo` → "Robo", `agresion_mujer` → "Agresión a mujer", `maltrato_animal` → "Maltrato animal", `pelea_colegio` → "Pelea en salida de colegio", `actividad_sospechosa` → "Actividad sospechosa".
+- Tipos de incidente (valor en la API → etiqueta en la UI): `robo` → "Robo", `agresion_mujer` → "Agresión a mujer", `maltrato_animal` → "Maltrato animal", `pelea_colegio` → "Pelea en salida de colegio", `actividad_sospechosa` → "Actividad sospechosa", `otro` → "Otro" (agregado el 2026-11-04 por el frame 06 de Figma).
 - Estado inicial de todo reporte: `sin_verificar`.
 - `descripcion`: opcional, se recorta (`trim`) y tiene como máximo 500 caracteres.
 - Ubicación válida solo dentro del bbox de Arequipa metropolitana: lat ∈ [-16.60, -16.25], lng ∈ [-71.75, -71.40].
@@ -264,7 +264,7 @@ app/                                             generado por flutter create (so
 - Test: `app/test/features/incident/incident_test.dart`, `app/test/features/map/map_incidents_controller_test.dart`
 
 **Interfaces:**
-- `enum IncidentType { robo, agresionMujer, maltratoAnimal, peleaColegio, actividadSospechosa }` con `String get wire` (`"agresion_mujer"`, …), `String get label` (etiquetas de las restricciones globales) y `static IncidentType? fromWire(String)`.
+- `enum IncidentType { robo, agresionMujer, maltratoAnimal, peleaColegio, actividadSospechosa, otro }` con `String get wire` (`"agresion_mujer"`, …), `String get label` (etiquetas de las restricciones globales) y `static IncidentType? fromWire(String)`.
 - `class Incident { final String id; final IncidentType tipo; final String? descripcion; final double lat, lng; final String estado; final DateTime creadoEn; factory Incident.fromJson(Map<String, dynamic>); }`
 - `class NewIncident { final IncidentType tipo; final String? descripcion; final double lat, lng; Map<String, dynamic> toJson(); }`
 - `class Bbox { final double minLng, minLat, maxLng, maxLat; String toQuery(); static const arequipa = Bbox(-71.75, -16.60, -71.40, -16.25); }`

@@ -2,7 +2,7 @@ defmodule Civic.Incidents.Incident do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @tipos [:robo, :agresion_mujer, :maltrato_animal, :pelea_colegio, :actividad_sospechosa]
+  @tipos [:robo, :agresion_mujer, :maltrato_animal, :pelea_colegio, :actividad_sospechosa, :otro]
 
   # Bbox de Arequipa metropolitana
   @lat_min -16.60

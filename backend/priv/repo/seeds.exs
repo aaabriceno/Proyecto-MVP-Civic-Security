@@ -67,6 +67,11 @@ descripciones = %{
     "Grupo de escolares agrediendo a otro alumno",
     "Enfrentamiento entre estudiantes de dos colegios"
   ],
+  "otro" => [
+    "Ruido y disturbios en la vía pública",
+    "Accidente con un vehículo estacionado",
+    "Poste de luz caído que bloquea la vereda"
+  ],
   "actividad_sospechosa" => [
     "Auto sin placa dando vueltas por la cuadra",
     "Personas observando las casas y tomando fotos",
