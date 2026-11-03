@@ -542,3 +542,10 @@ civic-security/
 - Una instancia → clúster + réplicas (sección 13).
 - Moderación: hoy no hay panel. Para contenido ilegal (por ejemplo, datos personales en una descripción) el equipo usa una tarea `mix` en consola remota. Si el volumen crece: botón "Reportar abuso" y un panel LiveView interno, que es para el equipo y no para entidades externas (respuesta 26).
 - Panel B2G para municipalidades: producto separado que consume agregados anónimos.
+
+## 20. Decisiones adicionales (2026-11-04)
+1. **Verificación de persona real con KYC de terceros.** A mediano plazo, DNI + selfie con prueba de vida a cargo de un proveedor que devuelve solo "verificado: sí/no". Civic Security **no guarda fotos del rostro ni datos biométricos** (son datos sensibles según la Ley 29733, no se pueden cambiar si se filtran y romperían el anonimato). Se guarda solo `HMAC(DNI)` y la marca de verificación.
+2. **Límites de solicitudes por capas.** IP con valores generosos (muchos alumnos comparten el wifi de la universidad) + límite estricto por cuenta o dispositivo (iteración 1) + mayor cupo para cuentas verificadas + Play Integrity antes del piloto.
+3. **Filtro de datos personales en la descripción** (DNI, celulares, correos y enlaces rechazados por el servidor) y aviso de anonimato en el formulario.
+4. **Tipo de incidente "Otro"** agregado (6 tipos), por el formulario de Figma.
+5. **Orden de trabajo:** reportes en el mapa (Tarea 8) -> formulario de reporte (Tarea 9) -> CI en GitHub Actions -> backend de cuentas (iteración 1) -> pantallas de login/registro de Figma.

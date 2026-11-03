@@ -39,6 +39,15 @@ void main() {
   });
 
   group('formatDistance', () {
+    test('distanceFromUser para unir a la hora', () {
+      expect(distanceFromUser(2), 'en tu ubicación');
+      expect(distanceFromUser(440), 'a 440 m de ti');
+    });
+    test('muy cerca se dice con palabras, no como "10 m"', () {
+      expect(describeDistanceToUser(2), 'En tu ubicación');
+      expect(describeDistanceToUser(120), 'A 120 m de ti');
+      expect(describeDistanceToUser(1500), 'A 1,5 km de ti');
+    });
     test('metros, redondeados a 10', () {
       expect(formatDistance(304), '300 m');
       expect(formatDistance(7), '10 m');
@@ -50,6 +59,12 @@ void main() {
   });
 
   group('estilo por tipo', () {
+    test('las etiquetas del formulario son las del diseño de Figma', () {
+      expect(reportLabel(IncidentType.robo), 'Robo / asalto');
+      expect(reportLabel(IncidentType.peleaColegio), 'Pelea / riña');
+      expect(reportLabel(IncidentType.otro), 'Otro');
+    });
+
     test('cada tipo tiene color, ícono y etiqueta corta propios', () {
       final colors = IncidentType.values.map(typeColor).toSet();
       final icons = IncidentType.values.map(typeIcon).toSet();
@@ -57,6 +72,7 @@ void main() {
       expect(icons.length, IncidentType.values.length);
       for (final t in IncidentType.values) {
         expect(typeShortLabel(t), isNotEmpty);
+        expect(reportLabel(t), isNotEmpty);
       }
     });
   });

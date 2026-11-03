@@ -284,6 +284,8 @@ app/                                             generado por flutter create (so
 
 ### Tarea 9: Pantalla Reportar (pin fijo al centro → POST)
 
+> **Hecha (2026-11-04), siguiendo los frames 06, 06c y 07 de Figma:** formulario con los 6 tipos, ubicación con ajuste en el mapa (pin fijo, distancia al usuario, bloqueo fuera de Arequipa), descripción con aviso de anonimato, envío con clave de idempotencia (se reutiliza solo si el contenido no cambia) y pantalla "Reporte enviado" con "Llamar al 105". Sin ubicación del usuario se elige primero el lugar en el mapa. La dirección en texto del diseño se reemplazó por coordenadas, porque convertirlas en dirección exigiría enviarlas a un servicio externo. La evidencia (foto) queda para la iteración 4 y no se promete avisar a otras personas hasta que existan las alertas.
+
 **Por qué:** es el flujo principal del producto (frames 06, 06c y 07, simplificados).
 
 **Archivos:**

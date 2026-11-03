@@ -31,6 +31,16 @@ String typeShortLabel(IncidentType type) => switch (type) {
   IncidentType.otro => 'Otro',
 };
 
+/// Etiqueta de cada tipo en el formulario de reporte (frame 06 de Figma).
+String reportLabel(IncidentType type) => switch (type) {
+  IncidentType.robo => 'Robo / asalto',
+  IncidentType.agresionMujer => 'Agresión a mujer',
+  IncidentType.maltratoAnimal => 'Maltrato animal',
+  IncidentType.peleaColegio => 'Pelea / riña',
+  IncidentType.actividadSospechosa => 'Actividad sospechosa',
+  IncidentType.otro => 'Otro',
+};
+
 Color statusColor(IncidentStatus status) => switch (status) {
   IncidentStatus.verificado => const Color(0xFF2E7D32),
   IncidentStatus.sinVerificar => const Color(0xFFB26A00),
@@ -56,3 +66,11 @@ String formatDistance(double meters) {
   if (km >= 10) return '${km.round()} km';
   return '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
 }
+
+/// "A 120 m de ti", "A 1,5 km de ti", o "En tu ubicación" si está encima.
+String describeDistanceToUser(double meters) =>
+    meters < 5 ? 'En tu ubicación' : 'A ${formatDistance(meters)} de ti';
+
+/// "a 440 m de ti" / "en tu ubicación", para unir a la hora: "Hace 5 h · a 440 m de ti".
+String distanceFromUser(double meters) =>
+    meters < 5 ? 'en tu ubicación' : 'a ${formatDistance(meters)} de ti';

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:civic_security/core/network/api_failure.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
+import 'package:civic_security/features/report/domain/new_incident.dart';
 import 'package:civic_security/features/map/presentation/map_incidents_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +29,12 @@ const _bbox = Bbox(
 class _FakeRepo implements IncidentRepository {
   final calls = <Bbox>[];
   final pending = <Completer<List<Incident>>>[];
+
+  @override
+  Future<Incident> create(
+    NewIncident input, {
+    required String idempotencyKey,
+  }) => throw UnimplementedError();
 
   @override
   Future<List<Incident>> fetchSnapshot(Bbox bbox) {

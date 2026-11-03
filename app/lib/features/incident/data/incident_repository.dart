@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_failure.dart';
+import '../../report/domain/new_incident.dart';
 import '../domain/incident.dart';
 
 /// De dónde salen los incidentes. Es una interfaz para poder reemplazarla por
@@ -11,6 +12,11 @@ abstract interface class IncidentRepository {
   /// Incidentes de las últimas 24 h dentro de [bbox].
   /// Lanza [ApiFailure] si algo falla.
   Future<List<Incident>> fetchSnapshot(Bbox bbox);
+
+  /// Crea un reporte anónimo. [idempotencyKey] evita duplicados si el envío
+  /// se reintenta: el mismo reporte con la misma clave no se guarda dos veces.
+  /// Lanza [ApiFailure] si algo falla.
+  Future<Incident> create(NewIncident input, {required String idempotencyKey});
 }
 
 class HttpIncidentRepository implements IncidentRepository {
@@ -26,6 +32,31 @@ class HttpIncidentRepository implements IncidentRepository {
         queryParameters: {'bbox': bbox.toQuery()},
       );
       return _parse(response.data);
+    } on DioException catch (e) {
+      throw ApiFailure.fromDio(e);
+    } on FormatException {
+      throw const ApiFailure.invalidResponse();
+    }
+  }
+
+  @override
+  Future<Incident> create(
+    NewIncident input, {
+    required String idempotencyKey,
+  }) async {
+    try {
+      final response = await _dio.post<Object?>(
+        '/v1/incidents',
+        data: input.toJson(),
+        options: Options(headers: {'idempotency-key': idempotencyKey}),
+      );
+      final body = response.data;
+      final data = body is Map ? body['data'] : null;
+      final incident = data is Map<String, dynamic>
+          ? Incident.tryFromJson(data)
+          : null;
+      if (incident == null) throw const ApiFailure.invalidResponse();
+      return incident;
     } on DioException catch (e) {
       throw ApiFailure.fromDio(e);
     } on FormatException {

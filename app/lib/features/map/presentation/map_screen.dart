@@ -8,6 +8,8 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/geo/arequipa.dart';
 import '../../../core/location/location_service.dart';
 import '../../incident/domain/incident.dart';
+import '../../report/presentation/adjust_location_screen.dart';
+import '../../report/presentation/report_screen.dart';
 import 'incident_detail.dart';
 import 'incident_pin.dart';
 import 'incidents_sheet.dart';
@@ -106,6 +108,36 @@ class _MapScreenState extends ConsumerState<MapScreen>
             east: b.east,
           ),
         );
+  }
+
+  /// Frame 05 -> 06: con ubicación abre el formulario; sin ella, primero pide
+  /// elegir el lugar en el mapa (frame 06c).
+  Future<void> _startReport(LatLng? userPosition) async {
+    var location = userPosition;
+    if (location == null) {
+      final camera = _controller.camera;
+      location = await Navigator.of(context).push<LatLng>(
+        MaterialPageRoute(
+          builder: (_) => AdjustLocationScreen(
+            initialCenter: camera.center,
+            // Si el mapa muestra toda la ciudad, acerca para poder ubicar
+            initialZoom: camera.zoom < 15 ? 15 : camera.zoom,
+          ),
+        ),
+      );
+      if (location == null || !mounted) return;
+    }
+
+    final incident = await Navigator.of(context).push<Incident>(
+      MaterialPageRoute(
+        builder: (_) => ReportScreen(
+          initialLocation: location!,
+          isUserLocation: userPosition != null,
+          userPosition: userPosition,
+        ),
+      ),
+    );
+    if (incident != null && mounted) _controller.move(incident.position, 17);
   }
 
   @override
@@ -229,17 +261,36 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 right: 16,
                 // Sube con la hoja, pero se queda en pantalla si se expande
                 bottom: height * extent.clamp(0.0, 0.5) + 16,
-                child: FloatingActionButton(
-                  key: const Key('boton-mi-ubicacion'),
-                  tooltip: 'Mi ubicación',
-                  onPressed: () {
-                    if (userPosition != null) {
-                      _controller.move(userPosition, _zoomInicial);
-                    } else {
-                      ref.invalidate(userLocationProvider);
-                    }
-                  },
-                  child: const Icon(Icons.my_location),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    FloatingActionButton.small(
+                      key: const Key('boton-mi-ubicacion'),
+                      // Sin animación Hero: dos botones con la misma etiqueta
+                      // hacen fallar el cambio de pantalla
+                      heroTag: null,
+                      tooltip: 'Mi ubicación',
+                      onPressed: () {
+                        if (userPosition != null) {
+                          _controller.move(userPosition, _zoomInicial);
+                        } else {
+                          ref.invalidate(userLocationProvider);
+                        }
+                      },
+                      child: const Icon(Icons.my_location),
+                    ),
+                    const SizedBox(height: 12),
+                    FloatingActionButton.extended(
+                      key: const Key('boton-reportar'),
+                      heroTag: null,
+                      backgroundColor: const Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      onPressed: () => _startReport(userPosition),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Reportar'),
+                    ),
+                  ],
                 ),
               );
             },

@@ -63,9 +63,7 @@ class _IncidentDetail extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            distance == null
-                ? when
-                : '$when · a ${formatDistance(distance)} de ti',
+            distance == null ? when : '$when · ${distanceFromUser(distance)}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),

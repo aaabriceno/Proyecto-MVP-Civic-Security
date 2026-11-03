@@ -6,6 +6,7 @@ import 'package:civic_security/core/location/location_service.dart';
 import 'package:civic_security/core/network/api_failure.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
+import 'package:civic_security/features/report/domain/new_incident.dart';
 import 'package:civic_security/features/map/presentation/map_providers.dart';
 import 'package:civic_security/features/map/presentation/map_screen.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,12 @@ class _FakeRepo implements IncidentRepository {
   List<Incident> incidents;
   ApiFailure? failure;
   final calls = <Bbox>[];
+
+  @override
+  Future<Incident> create(
+    NewIncident input, {
+    required String idempotencyKey,
+  }) => throw UnimplementedError();
 
   @override
   Future<List<Incident>> fetchSnapshot(Bbox bbox) async {
@@ -401,6 +408,58 @@ void main() {
 
       expect(find.text('2 incidentes en esta zona'), findsOneWidget);
       expect(find.textContaining('m de ti'), findsNothing);
+    });
+  });
+
+  group('reportar', () {
+    testWidgets('con ubicación abre el formulario con "Tu ubicación actual"', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+      );
+
+      await tester.tap(find.byKey(const Key('boton-reportar')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Qué está pasando?'), findsOneWidget);
+      expect(find.text('Tu ubicación actual'), findsOneWidget);
+    });
+
+    testWidgets('sin ubicación pide primero elegir el lugar en el mapa', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationUnavailable(LocationFailure.denied)),
+      );
+
+      await tester.tap(find.byKey(const Key('boton-reportar')));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Dónde ocurrió exactamente?'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('confirmar-ubicacion')));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Qué está pasando?'), findsOneWidget);
+      expect(find.text('Ubicación elegida en el mapa'), findsOneWidget);
+    });
+
+    testWidgets('cancelar el ajuste de ubicación vuelve al mapa', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationUnavailable(LocationFailure.denied)),
+      );
+
+      await tester.tap(find.byKey(const Key('boton-reportar')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('volver')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Qué está pasando?'), findsNothing);
+      expect(find.byKey(const Key('boton-reportar')), findsOneWidget);
     });
   });
 

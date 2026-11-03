@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:civic_security/core/network/api_failure.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
+import 'package:civic_security/features/report/domain/new_incident.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -149,4 +150,89 @@ void main() {
       }
     },
   );
+
+  group('create', () {
+    const input = NewIncident(
+      tipo: IncidentType.robo,
+      descripcion: 'Me robaron',
+      lat: -16.4,
+      lng: -71.5,
+    );
+    const key = '0b1b6b0e-4f6e-4a0e-9d44-9a5d0e0f7a11';
+
+    test('hace POST /v1/incidents con la clave y el cuerpo', () async {
+      final adapter = _FakeAdapter(201, {'data': _incident('nuevo')});
+      final created = await _repo(adapter).create(input, idempotencyKey: key);
+
+      expect(adapter.last!.method, 'POST');
+      expect(adapter.last!.path, '/v1/incidents');
+      expect(adapter.last!.headers['idempotency-key'], key);
+      expect(adapter.last!.data, input.toJson());
+      expect(created.id, 'nuevo');
+    });
+
+    test(
+      'un 200 (reintento ya guardado) también devuelve el incidente',
+      () async {
+        final adapter = _FakeAdapter(200, {'data': _incident('existente')});
+        expect(
+          (await _repo(adapter).create(input, idempotencyKey: key)).id,
+          'existente',
+        );
+      },
+    );
+
+    test('422 -> ApiFailure con los errores por campo', () async {
+      final adapter = _FakeAdapter(422, {
+        'error': {
+          'code': 'validation_failed',
+          'message': 'Datos inválidos',
+          'fields': {
+            'descripcion': ['no escribas datos personales'],
+          },
+        },
+      });
+      await expectLater(
+        _repo(adapter).create(input, idempotencyKey: key),
+        throwsA(
+          isA<ApiFailure>()
+              .having((f) => f.code, 'code', 'validation_failed')
+              .having((f) => f.fields['descripcion'], 'fields', [
+                'no escribas datos personales',
+              ]),
+        ),
+      );
+    });
+
+    test('una respuesta sin incidente -> invalid_response', () async {
+      for (final body in <Object>[
+        {'data': 'x'},
+        {'otra': 1},
+        {'data': _incident('x', tipo: 'ovni')},
+      ]) {
+        await expectLater(
+          _repo(_FakeAdapter(201, body)).create(input, idempotencyKey: key),
+          throwsA(
+            isA<ApiFailure>().having((f) => f.code, 'code', 'invalid_response'),
+          ),
+          reason: '$body',
+        );
+      }
+    });
+
+    test('sin conexión -> network', () async {
+      final adapter = _FakeAdapter(
+        201,
+        const {},
+        error: DioException(
+          requestOptions: RequestOptions(path: '/x'),
+          type: DioExceptionType.connectionTimeout,
+        ),
+      );
+      await expectLater(
+        _repo(adapter).create(input, idempotencyKey: key),
+        throwsA(isA<ApiFailure>().having((f) => f.code, 'code', 'network')),
+      );
+    });
+  });
 }

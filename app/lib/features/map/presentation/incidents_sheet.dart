@@ -136,7 +136,7 @@ class IncidentsSheet extends StatelessWidget {
               Text(
                 distance == null
                     ? when
-                    : '$when · a ${formatDistance(distance)} de ti',
+                    : '$when · ${distanceFromUser(distance)}',
               ),
               const SizedBox(height: 4),
               StatusChip(incident.estado),
