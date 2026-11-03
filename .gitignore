@@ -138,3 +138,14 @@ desktop.ini
 *.tmp
 *.temp
 .history/
+
+# ---------- LaTeX (archivos auxiliares de compilación) ----------
+*.aux
+*.fdb_latexmk
+*.fls
+*.nav
+*.snm
+*.toc
+*.out
+*.vrb
+*.synctex.gz

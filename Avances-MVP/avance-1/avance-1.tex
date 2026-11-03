@@ -1,0 +1,268 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\usetheme{Madrid}
+\setbeamertemplate{navigation symbols}{}
+
+\lstset{
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\bfseries,
+  showstringspaces=false,
+  frame=single,
+  rulecolor=\color{gray!40},
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1
+}
+
+\newcommand{\hecho}{\textbf{Hecho}}
+\newcommand{\pendiente}{Pendiente}
+
+\title[Civic Security]{Civic Security}
+\subtitle{Avance 1 del MVP: arquitectura y base de datos}
+% Completar con los nombres de los tres integrantes del equipo
+\author[Equipo Civic Security]{Equipo Civic Security}
+\institute[UCSP]{ET201 -- Formación de Empresas de Base Tecnológica I \\ Universidad Católica San Pablo}
+\date[28/10/2026]{28 de octubre de 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{El problema y nuestra propuesta}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Problema validado en entrevistas}
+      \begin{itemize}
+        \item La información de seguridad circula en grupos de WhatsApp, pero \alert{nadie confía en ella} porque no está verificada.
+        \item Muchas personas \alert{no reportan por miedo} a ser identificadas.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Civic Security}
+      \begin{enumerate}
+        \item Reporte \textbf{anónimo} y seguro.
+        \item \textbf{Validación comunitaria}: 3 confirmaciones de cuentas verificadas a menos de 1\,km.
+        \item \textbf{Mapa de calor} y alertas por zona en tiempo real.
+      \end{enumerate}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Qué logramos en este avance}
+  \begin{enumerate}
+    \item \textbf{Arquitectura definida y documentada} (v0.2), con las decisiones del equipo incorporadas.
+    \item \textbf{Repositorio público} con historial de commits del equipo.
+    \item \textbf{Base de datos funcionando}: PostgreSQL + PostGIS en Docker.
+    \item \textbf{Backend Phoenix} con verificación de salud (\texttt{/health}).
+    \item \textbf{Modelo de incidente} con las reglas de negocio y \textbf{10 pruebas automáticas} en verde.
+  \end{enumerate}
+  \vfill
+  \small Repositorio: \url{https://github.com/aaabriceno/Proyecto-MVP-Civic-Security}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Arquitectura: monolito modular}
+  \centering
+  \begin{tikzpicture}[
+      caja/.style={draw=structure, fill=structure!10, rounded corners, minimum width=3.3cm, minimum height=1.2cm, align=center, font=\small},
+      ext/.style={draw=gray, dashed, rounded corners, minimum width=2.6cm, minimum height=0.8cm, align=center, font=\scriptsize},
+      flecha/.style={-{Stealth}, thick, structure}
+    ]
+    \node[caja] (app) {\textbf{App móvil}\\Flutter (Android)};
+    \node[caja, right=1.6cm of app] (api) {\textbf{Backend}\\Elixir + Phoenix};
+    \node[caja, right=1.6cm of api] (db) {\textbf{Base de datos}\\PostgreSQL + PostGIS};
+    \node[ext, below=0.9cm of api] (fcm) {Notificaciones push\\(Firebase)};
+    \node[ext, below=0.9cm of db] (r2) {Fotos\\(Cloudflare R2)};
+
+    \draw[flecha] (app) -- node[above, font=\scriptsize]{REST + WebSocket} (api);
+    \draw[flecha] (api) -- node[above, font=\scriptsize]{SQL} (db);
+    \draw[flecha, gray] (api) -- (fcm);
+    \draw[flecha, gray] (api) -- (r2);
+  \end{tikzpicture}
+
+  \vspace{0.6em}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \small\textbf{Grano fino (mantenibilidad):} el código se divide en módulos por dominio con fronteras claras.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small\textbf{Grano grueso (rendimiento):} se despliega como un solo servicio y una sola base de datos, sin la complejidad de microservicios.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Decisiones del equipo}
+  \begin{table}
+    \small
+    \begin{tabular}{p{0.3\textwidth}p{0.62\textwidth}}
+      \toprule
+      \textbf{Tema} & \textbf{Decisión} \\
+      \midrule
+      Verificación de persona & DNI, guardando solo un \textbf{HMAC} (nunca el número). Una cuenta por DNI. \\
+      Zonas de alerta & En el servidor: celda aproximada en claro y \textbf{centro exacto cifrado}. \\
+      Red P2P & Descartada: sin servidor central no se puede garantizar la validación comunitaria. \\
+      Plataforma de la demo & Solo Android. \\
+      Fuera del MVP & Entrega cifrada a la PNP, eventos de tráfico, passkeys. \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Privacidad por diseño}
+  \textbf{El anonimato se garantiza por la estructura de los datos, no solo por una política.}
+  \vspace{0.5em}
+  \begin{table}
+    \small
+    \begin{tabular}{lll}
+      \toprule
+      \textbf{Dato} & \textbf{Tratamiento} & \textbf{Por qué} \\
+      \midrule
+      Reporte & Sin campo de usuario ni IP & Nadie puede saber quién reportó \\
+      DNI & HMAC con clave secreta & Irreversible; solo detecta duplicados \\
+      Centro de zona & Cifrado AES-256-GCM & Se descifra solo en memoria \\
+      Fotos & Rostros difuminados, sin EXIF & No exponen a terceros ni la ubicación \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+  \vfill
+  \small Estándares de referencia: OWASP MASVS, OWASP ASVS, NIST SP 800-63B y Ley N.º 29733.
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Base de datos: tabla \texttt{incidentes}}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+\begin{lstlisting}
+ Column          | Type
+-----------------+-----------------------
+ id              | uuid
+ tipo            | character varying(255)
+ descripcion     | character varying(500)
+ ubicacion       | geography(Point,4326)
+ estado          | character varying(255)
+ idempotency_key | uuid
+ inserted_at     | timestamp
+ updated_at      | timestamp
+Indexes:
+ incidentes_pkey   PRIMARY KEY (id)
+ ..._idempotency_key_index  UNIQUE
+ ..._inserted_at_index      btree
+ ..._ubicacion_index        gist
+\end{lstlisting}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{UUID}: los reportes no se pueden enumerar (1, 2, 3\ldots).
+        \item \textbf{geography}: distancias reales en metros, para la regla de 1\,km.
+        \item \textbf{Índice GiST}: búsquedas rápidas por zona del mapa.
+        \item \textbf{UNIQUE}: impide reportes duplicados.
+        \item \alert{Ninguna columna identifica al usuario.}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Reglas de negocio en el código}
+  \begin{columns}[T]
+    \begin{column}{0.58\textwidth}
+\begin{lstlisting}[language=Ruby,basicstyle=\ttfamily\fontsize{6.5}{8}\selectfont]
+def create_changeset(incident, attrs) do
+  incident
+  |> cast(attrs, [:tipo, :descripcion, :lat, :lng])
+  |> validate_required([:tipo, :lat, :lng])
+  |> update_change(:descripcion, &trim_or_nil/1)
+  |> validate_length(:descripcion, max: 500)
+  |> validate_arequipa()
+  |> put_ubicacion()
+  |> unique_constraint(:idempotency_key)
+end
+\end{lstlisting}
+    \end{column}
+    \begin{column}{0.39\textwidth}
+      \small
+      \begin{itemize}
+        \item Solo 5 tipos de incidente válidos.
+        \item Ubicación obligatoria y \textbf{dentro de Arequipa}.
+        \item Descripción opcional, máximo 500 caracteres.
+        \item Todo reporte nace como \textbf{``Sin verificar''}.
+        \item \textbf{Lista blanca} de campos: nadie puede marcar su propio reporte como verificado.
+        \item \textbf{Idempotencia}: si la app reintenta por mala señal, no se duplica.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Evidencia de funcionamiento}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{\small Base de datos (Docker)}
+\begin{lstlisting}
+$ docker compose ps
+civic_db | postgis/postgis:17-3.5
+         | Up (healthy) | 127.0.0.1:5432
+
+$ SELECT postgis_version();
+3.5 USE_GEOS=1 USE_PROJ=1 USE_STATS=1
+\end{lstlisting}
+      \scriptsize La base de datos solo acepta conexiones locales (\texttt{127.0.0.1}).
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \textbf{\small Pruebas automáticas}
+\begin{lstlisting}
+$ mix test --trace test/civic
+* crea un incidente válido (sin_verificar)
+* rechaza tipo desconocido
+* rechaza ubicación fuera de Arequipa
+* exige lat y lng
+* descripción con solo espacios -> nil
+* descripción de 501 caracteres inválida
+* misma idempotency_key -> mismo incidente
+
+10 tests, 0 failures
+\end{lstlisting}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Estado del plan del primer entregable funcional}
+  \small
+  \begin{table}
+    \begin{tabular}{clc}
+      \toprule
+      \textbf{\#} & \textbf{Tarea} & \textbf{Estado} \\
+      \midrule
+      1 & Base de datos PostgreSQL + PostGIS en Docker & \hecho \\
+      2 & Backend Phoenix con verificación de salud & \hecho \\
+      3 & Modelo de incidente con reglas de negocio & \hecho \\
+      4 & API para crear reportes (\texttt{POST /v1/incidents}) & \pendiente \\
+      5 & API del mapa (\texttt{GET /v1/map/snapshot}) & \pendiente \\
+      6 & Canal en tiempo real & \pendiente \\
+      7--10 & App Flutter: mapa, reporte y pines en tiempo real & \pendiente \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+  \vfill
+  \textbf{Meta del entregable:} un reporte creado en un teléfono Android aparece en el mapa de otro teléfono en tiempo real.
+\end{frame}
+
+% ------------------------------------------------------------------
+
+
+\end{document}
