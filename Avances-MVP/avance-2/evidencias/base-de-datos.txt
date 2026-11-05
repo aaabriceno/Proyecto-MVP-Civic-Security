@@ -1,0 +1,39 @@
+$ docker compose ps
+civic_db | postgis/postgis:17-3.5 | Up 42 minutes (healthy) | 127.0.0.1:5432->5432/tcp
+
+$ psql: \d incidentes
+                                         Table "public.incidentes"
+     Column      |            Type             | Collation | Nullable |              Default               
+-----------------+-----------------------------+-----------+----------+------------------------------------
+ id              | uuid                        |           | not null | 
+ tipo            | character varying(255)      |           | not null | 
+ descripcion     | character varying(500)      |           |          | 
+ ubicacion       | geography(Point,4326)       |           | not null | 
+ estado          | character varying(255)      |           | not null | 'sin_verificar'::character varying
+ idempotency_key | uuid                        |           | not null | 
+ inserted_at     | timestamp without time zone |           | not null | 
+ updated_at      | timestamp without time zone |           | not null | 
+Indexes:
+    "incidentes_pkey" PRIMARY KEY, btree (id)
+    "incidentes_idempotency_key_index" UNIQUE, btree (idempotency_key)
+    "incidentes_inserted_at_index" btree (inserted_at)
+    "incidentes_ubicacion_index" gist (ubicacion)
+
+$ psql: reportes por tipo y estado (datos ficticios)
+         tipo         | reportes 
+----------------------+----------
+ pelea_colegio        |       20
+ maltrato_animal      |       16
+ agresion_mujer       |       11
+ robo                 |       11
+ otro                 |       11
+ actividad_sospechosa |       11
+(6 rows)
+
+    estado     | reportes 
+---------------+----------
+ sin_verificar |       48
+ verificado    |       25
+ descartado    |        7
+(3 rows)
+

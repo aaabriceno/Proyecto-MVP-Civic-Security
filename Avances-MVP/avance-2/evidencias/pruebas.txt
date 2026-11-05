@@ -1,0 +1,20 @@
+$ cd backend && mix test
+
+.............................................................
+Finished in 0.7 seconds (0.4s async, 0.2s sync)
+61 tests, 0 failures
+
+$ mix sobelow
+
+... SCAN COMPLETE ...
+
+
+$ mix deps.audit
+No vulnerabilities found.
+
+$ cd app && flutter analyze
+Analyzing app...                                                
+No issues found! (ran in 2.3s)
+
+$ flutter test
+00:05 +120: All tests passed!

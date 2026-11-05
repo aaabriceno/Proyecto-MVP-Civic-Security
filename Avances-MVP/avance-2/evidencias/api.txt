@@ -1,0 +1,38 @@
+$ curl -s http://127.0.0.1:4000/health
+{"status":"ok"}
+
+$ curl -s "http://127.0.0.1:4000/v1/map/snapshot?bbox=-71.545,-16.405,-71.525,-16.390"   # primer incidente de la lista
+incidentes en el área: 13
+{
+  "id": "93f0f4e9-d9e1-4ff8-86e3-34fc676ef6da",
+  "descripcion": "Robo de autopartes a un auto estacionado",
+  "estado": "sin_verificar",
+  "lat": -16.401918,
+  "lng": -71.534377,
+  "tipo": "robo",
+  "creado_en": "2026-11-05T18:23:00.000000Z"
+}
+
+$ curl -i -X POST /v1/incidents -H "idempotency-key: <uuid>" -d {tipo robo, lat -16.3963, lng -71.5340}
+HTTP/1.1 201 Created
+cache-control: no-store
+x-content-type-options: nosniff
+x-frame-options: DENY
+referrer-policy: no-referrer
+content-security-policy: default-src 'none'; frame-ancestors 'none'
+{"data":{"id":"a2392f57-9846-4270-ae01-24afb8a24ef1","descripcion":"EVIDENCIA informe","estado":"sin_verificar","lat":-16.3963,"lng":-71.534,"tipo":"robo","creado_en":"2026-11-05T18:48:27.369989Z"}}
+
+$ (mismo envío repetido con la misma clave)
+HTTP 200
+
+$ (sin encabezado idempotency-key)
+{"error":{"code":"idempotency_key_required","message":"Falta el encabezado idempotency-key o no es un UUID válido"}}  [HTTP 400]
+
+$ (reporte en Lima: fuera de Arequipa)
+{"error":{"code":"validation_failed","message":"Datos inválidos","fields":{"ubicacion":["La ubicación debe estar dentro de Arequipa"]}}}  [HTTP 422]
+
+$ (descripción con un teléfono)
+{"error":{"code":"validation_failed","message":"Datos inválidos","fields":{"descripcion":["no escribas datos personales (DNI, teléfonos, correos ni enlaces)"]}}}  [HTTP 422]
+
+$ (cuerpo mayor a 8 KB)
+HTTP 413
