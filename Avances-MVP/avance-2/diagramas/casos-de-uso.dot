@@ -1,0 +1,48 @@
+digraph CU {
+  rankdir=LR; splines=true; nodesep=0.22; ranksep=0.9; fontname="Helvetica";
+  node [fontname="Helvetica", fontsize=15, margin="0.12,0.06"]; edge [fontname="Helvetica", fontsize=12];
+
+  node [shape=box, style="rounded,filled", fillcolor="#E0E7FF", color="#4338CA"];
+  inv  [label="«actor»\nInvitado\n(sin cuenta)"];
+  ver  [label="«actor»\nUsuario verificado"];
+  fcm  [label="«actor externo»\nFirebase Cloud\nMessaging", fillcolor="#FEF3C7", color="#B45309"];
+  ver -> inv [arrowhead=onormal, label="  generaliza"];
+
+  subgraph cluster_sys {
+    label="Sistema Civic Security (MVP)"; style="rounded"; color="#6B7280"; fontsize=13;
+    node [shape=ellipse, style=filled];
+    // implementados
+    node [fillcolor="#DCFCE7", color="#16A34A"];
+    uc1 [label="Ver mapa de incidentes\ncercanos"];
+    uc2 [label="Filtrar por tipo"];
+    uc3 [label="Consultar detalle\ndel incidente"];
+    uc4 [label="Reportar incidente\nanónimo"];
+    uc5 [label="Ajustar ubicación\ndel reporte"];
+    uc6 [label="Llamar al 105"];
+    // planificados
+    node [fillcolor="#F3F4F6", color="#6B7280", style="dashed,filled"];
+    uc7 [label="Registrarse y verificar\nidentidad (DNI)"];
+    uc8 [label="Iniciar sesión"];
+    uc9 [label="Confirmar / marcar\ncomo falso"];
+    uc10 [label="Ver mapa de calor"];
+    uc11 [label="Suscribir zona\nde alerta"];
+    uc12 [label="Adjuntar foto\n(rostros difuminados)"];
+    uc13 [label="Recibir alerta push"];
+  }
+
+  edge [dir=none, color="#374151"];
+  inv -> uc1; inv -> uc2; inv -> uc3; inv -> uc4; inv -> uc6; inv -> uc7; inv -> uc8; inv -> uc10;
+  ver -> uc9; ver -> uc11;
+  uc13 -> fcm [style=dashed];
+
+  edge [dir=forward, style=dashed, color="#374151", arrowhead=vee];
+  uc4 -> uc5 [label="«include»"];
+  uc12 -> uc4 [label="«extend»"];
+  uc9 -> uc3 [label="«include»"];
+  uc11 -> uc13 [label="«include»"];
+  uc2 -> uc1 [label="«extend»"];
+
+  legend [shape=none, label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#DCFCE7">Implementado (avance 2)</td></tr>
+    <tr><td bgcolor="#F3F4F6">Planificado</td></tr></table>>];
+}

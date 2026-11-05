@@ -1,0 +1,19 @@
+digraph EST {
+  rankdir=LR; nodesep=0.6; ranksep=1.1; fontname="Helvetica";
+  node [fontname="Helvetica", fontsize=12]; edge [fontname="Helvetica", fontsize=10];
+
+  ini [shape=circle, style=filled, fillcolor=black, label="", width=0.25];
+  sv  [shape=box, style="rounded,filled", fillcolor="#DCFCE7", color="#16A34A", label="Sin verificar\n(estado inicial)"];
+  v   [shape=box, style="rounded,dashed,filled", fillcolor="#F3F4F6", color="#6B7280", label="Verificado"];
+  d   [shape=box, style="rounded,dashed,filled", fillcolor="#F3F4F6", color="#6B7280", label="Descartado"];
+  fin [shape=doublecircle, style=filled, fillcolor=black, label="", width=0.2];
+
+  ini -> sv [label="POST /v1/incidents\n[datos válidos]"];
+  sv -> v [style=dashed, label="3 confirmaciones de cuentas\nverificadas a menos de 1 km"];
+  sv -> d [style=dashed, label="3 votos «Es falso»\nantes de verificarse"];
+  v -> fin [style=dashed, label="a los 5 años:\nse elimina el detalle"];
+  d -> fin [style=dashed, label="a los 5 años:\nse elimina el detalle"];
+
+  note [shape=note, fontsize=10, label="La columna «estado» ya admite los tres valores;\nlas transiciones se implementan en la iteración 2\n(validación comunitaria)."];
+  sv -> note [style=invis];
+}

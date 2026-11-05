@@ -1,0 +1,50 @@
+digraph CB {
+  rankdir=TB; nodesep=0.5; ranksep=0.9; fontname="Helvetica"; splines=true;
+  node [shape=plaintext, fontname="Helvetica", fontsize=10];
+  edge [fontname="Helvetica", fontsize=9, color="#374151"];
+
+  class_Incident [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#DCFCE7"><b>Incident</b><br/>«Ecto.Schema»</td></tr>
+    <tr><td align="left">id : uuid<br align="left"/>tipo : enum (6)<br align="left"/>descripcion : string?<br align="left"/>ubicacion : Geo.Point<br align="left"/>estado : enum (3)<br align="left"/>idempotency_key : uuid<br align="left"/>/lat, lng : float (virtual)<br align="left"/></td></tr>
+    <tr><td align="left">create_changeset/2<br align="left"/>same_content?/2<br align="left"/>coords/1<br align="left"/></td></tr></table>>];
+  class_Incidents [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#DBEAFE"><b>Incidents</b><br/>«contexto»</td></tr>
+    <tr><td align="left">create_incident(attrs, key)<br align="left"/>list_recent(bbox, since)<br align="left"/></td></tr></table>>];
+  class_Bbox [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#DBEAFE"><b>Bbox</b></td></tr>
+    <tr><td align="left">parse(texto) : {:ok, bbox} | {:error, :invalid_bbox}<br align="left"/></td></tr></table>>];
+  class_Repo [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#E5E7EB"><b>Repo</b><br/>«Ecto.Repo»</td></tr></table>>];
+  class_IC [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FEF3C7"><b>IncidentController</b></td></tr>
+    <tr><td align="left">create(conn, params)<br align="left"/></td></tr></table>>];
+  class_MC [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FEF3C7"><b>MapController</b></td></tr>
+    <tr><td align="left">snapshot(conn, params)<br align="left"/></td></tr></table>>];
+  class_FB [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FEF3C7"><b>FallbackController</b></td></tr>
+    <tr><td align="left">call(conn, {:error, ...}) → 400 / 409 / 422<br align="left"/></td></tr></table>>];
+  class_JSON [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FEF3C7"><b>IncidentJSON / MapJSON</b></td></tr>
+    <tr><td align="left">data(incident) : 7 campos públicos<br align="left"/></td></tr></table>>];
+  class_Chan [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FEF3C7"><b>MapaChannel</b><br/>topic «mapa:arequipa»</td></tr>
+    <tr><td align="left">join/3 · solo escucha<br align="left"/></td></tr></table>>];
+  class_Sock [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FEF3C7"><b>UserSocket</b></td></tr>
+    <tr><td align="left">connect/3 (límite por IP)<br align="left"/></td></tr></table>>];
+  class_RL [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FCE7F3"><b>RateLimit</b><br/>(Hammer / ETS)</td></tr>
+    <tr><td align="left">check(bucket, cliente)<br align="left"/>limits(bucket)<br align="left"/></td></tr></table>>];
+  class_RLP [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3">
+    <tr><td bgcolor="#FCE7F3"><b>Plugs.RateLimit</b><br/>«Plug»</td></tr>
+    <tr><td align="left">call(conn, bucket) → 429<br align="left"/></td></tr></table>>];
+
+  class_IC -> class_Incidents [label="usa"]; class_MC -> class_Incidents [label="usa"]; class_MC -> class_Bbox [label="usa"];
+  class_Incidents -> class_Incident [label="crea / consulta"]; class_Incidents -> class_Repo [label="usa"];
+  class_IC -> class_FB [label="action_fallback", style=dashed]; class_MC -> class_FB [style=dashed];
+  class_IC -> class_JSON [label="renderiza"]; class_MC -> class_JSON;
+  class_IC -> class_Chan [label="broadcast\n«incidente_nuevo»", style=dashed];
+  class_Sock -> class_Chan [label="enruta"]; class_Sock -> class_RL [label="usa"]; class_RLP -> class_RL [label="usa"];
+  class_RLP -> class_IC [label="protege\n(router)", style=dotted]; class_RLP -> class_MC [style=dotted];
+}

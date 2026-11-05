@@ -1,0 +1,28 @@
+digraph COMP {
+  rankdir=TB; nodesep=0.45; ranksep=0.9; fontname="Helvetica"; compound=true;
+  node [shape=component, fontname="Helvetica", fontsize=10, style=filled]; edge [fontname="Helvetica", fontsize=9];
+
+  subgraph cluster_app { label="App móvil Android (Flutter / Dart)"; style="rounded,filled"; fillcolor="#F0FDF4"; color="#16A34A"; fontsize=12;
+    node [fillcolor="#DCFCE7", color="#16A34A"];
+    a_map [label="features/map\n(mapa, pines, lista, filtros)"]; a_rep [label="features/report\n(formulario, ubicación, enviado)"];
+    a_inc [label="features/incident\n(modelo + repositorio)"]; a_loc [label="core/location\n(GPS y permisos)"]; a_net [label="core/network\n(Dio, errores)"];
+    node [fillcolor="#F3F4F6", color="#6B7280", style="dashed,filled"];
+    a_auth [label="features/auth\n(login, registro)"]; a_alert [label="features/alerts\n(zonas, push)"];
+  }
+  subgraph cluster_api { label="API Phoenix (Elixir) — monolito modular"; style="rounded,filled"; fillcolor="#EFF6FF"; color="#2563EB"; fontsize=12;
+    node [fillcolor="#DBEAFE", color="#2563EB", style=filled];
+    p_web [label="CivicWeb\n(router, controladores,\nplugs, canal)"]; p_inc [label="Civic.Incidents\n(reglas de negocio)"]; p_rl [label="Civic.RateLimit\n(ETS en memoria)"];
+    node [fillcolor="#F3F4F6", color="#6B7280", style="dashed,filled"];
+    p_acc [label="Accounts / Verification\n(cuentas, DNI HMAC)"]; p_val [label="Validation\n(votos, regla 1 km)"];
+  }
+  db  [shape=cylinder, label="PostgreSQL 17\n+ PostGIS 3.5\n(Docker)", fillcolor="#DCFCE7", color="#16A34A"];
+  osm [shape=component, label="OpenStreetMap\n(servidor de teselas)", fillcolor="#FEF3C7", color="#B45309"];
+  fcm [shape=component, label="Firebase Cloud\nMessaging", fillcolor="#F3F4F6", color="#6B7280", style="dashed,filled"];
+
+  a_net -> p_web [label="REST /v1 (JSON)"];
+  a_inc -> a_net; a_map -> a_inc; a_rep -> a_inc; a_map -> a_loc; a_rep -> a_loc;
+  a_map -> osm [label="HTTPS: teselas"];
+  p_web -> p_inc; p_web -> p_rl; p_inc -> db [label="SQL (Ecto)"];
+  a_map -> p_web [label="WebSocket\n(planificado en la app)", style=dashed, constraint=false];
+  p_web -> fcm [style=dashed, label="push (planificado)"];
+}

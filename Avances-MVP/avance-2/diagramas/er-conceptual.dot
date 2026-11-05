@@ -1,0 +1,21 @@
+graph ERC {
+  layout=neato; overlap=false; splines=true; sep="+18"; fontname="Helvetica";
+  node [fontname="Helvetica", fontsize=12]; edge [fontname="Helvetica", fontsize=11];
+
+  node [shape=box, style="filled", fillcolor="#F3F4F6", color="#6B7280", penwidth=1.5];
+  USUARIO [pos="0,4!"]; CONFIRMACION [pos="5,4!"]; ZONA_ALERTA [pos="0,0!"]; DISPOSITIVO [pos="-4,2!"]; EVIDENCIA [pos="10,0!"];
+  node [fillcolor="#DCFCE7", color="#16A34A", penwidth=2.5];
+  INCIDENTE [pos="10,4!"];
+
+  node [shape=diamond, style="filled", fillcolor="white", color="#374151", penwidth=1, fontsize=10];
+  vota [pos="2.5,4!"]; recibe [pos="7.5,4!", label="recibe"]; tiene [pos="10,2!", label="adjunta"]; define [pos="0,2!"]; usa [pos="-2,3!"];
+
+  USUARIO -- vota [label="1"]; vota -- CONFIRMACION [label="N"];
+  CONFIRMACION -- recibe [label="N"]; recibe -- INCIDENTE [label="1"];
+  INCIDENTE -- tiene [label="1"]; tiene -- EVIDENCIA [label="N"];
+  USUARIO -- define [label="1"]; define -- ZONA_ALERTA [label="N"];
+  USUARIO -- usa [label="1"]; usa -- DISPOSITIVO [label="N"];
+
+  nota [shape=note, style=filled, fillcolor="#FEF9C3", color="#CA8A04", fontsize=10, pos="5,-1.6!",
+    label="PRIVACIDAD POR DISEÑO: no existe relación USUARIO–INCIDENTE.\nEl reporte es anónimo; los votos solo guardan un token HMAC por incidente."];
+}

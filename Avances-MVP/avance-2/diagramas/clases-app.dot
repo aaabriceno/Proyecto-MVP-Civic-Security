@@ -1,0 +1,42 @@
+digraph CA {
+  rankdir=TB; nodesep=0.45; ranksep=0.85; fontname="Helvetica"; splines=true;
+  node [shape=plaintext, fontname="Helvetica", fontsize=10];
+  edge [fontname="Helvetica", fontsize=9, color="#374151"];
+
+  Incident [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DCFCE7"><b>Incident</b></td></tr>
+    <tr><td align="left">id, descripcion?<br align="left"/>tipo : IncidentType<br align="left"/>estado : IncidentStatus<br align="left"/>position : LatLng · creadoEn : UTC<br align="left"/></td></tr>
+    <tr><td align="left">tryFromJson(json)<br align="left"/></td></tr></table>>];
+  Type [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DCFCE7"><b>IncidentType</b><br/>«enum»</td></tr>
+    <tr><td align="left">robo, agresionMujer, maltratoAnimal,<br align="left"/>peleaColegio, actividadSospechosa, otro<br align="left"/></td></tr></table>>];
+  Status [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DCFCE7"><b>IncidentStatus</b><br/>«enum»</td></tr>
+    <tr><td align="left">sinVerificar, verificado, descartado<br align="left"/></td></tr></table>>];
+  NewIncident [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DCFCE7"><b>NewIncident</b></td></tr>
+    <tr><td align="left">tipo, lat, lng, descripcion?<br align="left"/></td></tr><tr><td align="left">toJson()<br align="left"/></td></tr></table>>];
+  Bbox [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DCFCE7"><b>Bbox</b></td></tr>
+    <tr><td align="left">minLng, minLat, maxLng, maxLat<br align="left"/></td></tr><tr><td align="left">toQuery()<br align="left"/></td></tr></table>>];
+  Failure [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DCFCE7"><b>ApiFailure</b></td></tr>
+    <tr><td align="left">code, message, fields<br align="left"/></td></tr><tr><td align="left">fromDio(e)<br align="left"/></td></tr></table>>];
+  Repo [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DBEAFE"><b>IncidentRepository</b><br/>«interface»</td></tr>
+    <tr><td align="left">fetchSnapshot(bbox)<br align="left"/>create(input, idempotencyKey)<br align="left"/></td></tr></table>>];
+  HttpRepo [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DBEAFE"><b>HttpIncidentRepository</b></td></tr>
+    <tr><td align="left">usa Dio → /v1/map/snapshot, /v1/incidents<br align="left"/></td></tr></table>>];
+  MapCtl [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#FEF3C7"><b>MapIncidentsController</b><br/>«Riverpod Notifier»</td></tr>
+    <tr><td align="left">load(bbox) · retry() · upsert(incident)<br align="left"/></td></tr></table>>];
+  RepCtl [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#FEF3C7"><b>ReportController</b><br/>«Riverpod Notifier»</td></tr>
+    <tr><td align="left">submit(input) — clave de idempotencia<br align="left"/></td></tr></table>>];
+  Loc [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DBEAFE"><b>LocationService</b><br/>«interface»</td></tr>
+    <tr><td align="left">locate() · watch() · openSettingsFor()<br align="left"/></td></tr></table>>];
+  GeoLoc [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#DBEAFE"><b>GeolocatorLocationService</b></td></tr></table>>];
+  Map [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#E5E7EB"><b>MapScreen</b><br/>«pantalla»</td></tr></table>>];
+  Rep [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#E5E7EB"><b>ReportScreen</b><br/>«pantalla»</td></tr></table>>];
+  Adj [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#E5E7EB"><b>AdjustLocationScreen</b><br/>«pantalla»</td></tr></table>>];
+  Sent [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="3"><tr><td bgcolor="#E5E7EB"><b>ReportSentScreen</b><br/>«pantalla»</td></tr></table>>];
+
+  Incident -> Type [arrowhead=vee]; Incident -> Status [arrowhead=vee]; NewIncident -> Type [arrowhead=vee];
+  HttpRepo -> Repo [arrowhead=onormal, style=dashed, label="implementa"]; GeoLoc -> Loc [arrowhead=onormal, style=dashed, label="implementa"];
+  Repo -> Incident [label="devuelve", arrowhead=vee]; Repo -> Failure [label="lanza", arrowhead=vee, style=dashed];
+  MapCtl -> Repo [arrowhead=vee, label="usa"]; RepCtl -> Repo [arrowhead=vee, label="usa"]; RepCtl -> MapCtl [arrowhead=vee, label="upsert", style=dashed];
+  MapCtl -> Bbox [arrowhead=vee];
+  Map -> MapCtl [arrowhead=vee, label="observa"]; Map -> Loc [arrowhead=vee, label="usa"]; Map -> Rep [arrowhead=vee, label="abre", style=dashed];
+  Rep -> RepCtl [arrowhead=vee, label="observa"]; Rep -> Adj [arrowhead=vee, style=dashed]; Rep -> Sent [arrowhead=vee, style=dashed];
+}

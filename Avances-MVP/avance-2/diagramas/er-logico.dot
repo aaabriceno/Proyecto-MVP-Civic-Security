@@ -1,0 +1,58 @@
+digraph ERL {
+  rankdir=LR; nodesep=0.55; ranksep=1.4; fontname="Helvetica"; splines=true;
+  node [shape=plaintext, fontname="Helvetica", fontsize=10]; edge [arrowhead=crow, arrowtail=tee, dir=both, color="#374151"];
+
+  INCIDENTE [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#16A34A"><font color="white"><b>INCIDENTE</b> (implementada)</font></td></tr>
+    <tr><td align="left" bgcolor="#DCFCE7"><b>PK</b> id : identificador único</td></tr>
+    <tr><td align="left" bgcolor="#DCFCE7">tipo : texto (6 valores)</td></tr>
+    <tr><td align="left" bgcolor="#DCFCE7">descripcion : texto ≤ 500, opcional</td></tr>
+    <tr><td align="left" bgcolor="#DCFCE7">ubicacion : punto geográfico</td></tr>
+    <tr><td align="left" bgcolor="#DCFCE7">estado : texto (3 valores)</td></tr>
+    <tr><td align="left" bgcolor="#DCFCE7">idempotency_key : identificador, único</td></tr>
+    <tr><td align="left" bgcolor="#DCFCE7">creado_en, actualizado_en : fecha-hora UTC</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><i>reporter_token, peso (planificado)</i></td></tr></table>>];
+
+  CONFIRMACION [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#6B7280"><font color="white"><b>CONFIRMACION</b> (planificada)</font></td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>PK</b> id</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>FK</b> incidente_id → INCIDENTE</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">valor : confirmo | falso</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">voter_token : hash HMAC (sin usuario)</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">creado_en · UNIQUE(incidente_id, voter_token)</td></tr></table>>];
+
+  EVIDENCIA [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#6B7280"><font color="white"><b>EVIDENCIA</b> (planificada)</font></td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>PK</b> id</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>FK</b> incidente_id → INCIDENTE</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">objeto_key, estado, bytes</td></tr></table>>];
+
+  USUARIO [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#6B7280"><font color="white"><b>USUARIO</b> (planificada)</font></td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>PK</b> id</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">alias : texto, único</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">password_hash : Argon2id</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">nivel : invitado | verificado</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">verif_hash : HMAC(DNI), único</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">reputacion, creado_en</td></tr>
+    <tr><td align="left"><i>sin nombre, teléfono, correo, DNI ni IP</i></td></tr></table>>];
+
+  ZONA_ALERTA [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#6B7280"><font color="white"><b>ZONA_ALERTA</b> (planificada)</font></td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>PK</b> id</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>FK</b> usuario_id → USUARIO</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">nombre, radio_m</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">celdas : lista geohash (índice grueso)</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">centro_cifrado : AES-256-GCM</td></tr></table>>];
+
+  DISPOSITIVO [label=<<table border="0" cellborder="1" cellspacing="0" cellpadding="4">
+    <tr><td bgcolor="#6B7280"><font color="white"><b>DISPOSITIVO</b> (planificada)</font></td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>PK</b> id</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6"><b>FK</b> usuario_id → USUARIO</td></tr>
+    <tr><td align="left" bgcolor="#F3F4F6">fcm_token_cifrado, plataforma</td></tr></table>>];
+
+  INCIDENTE -> CONFIRMACION [label=" 1 : N"];
+  INCIDENTE -> EVIDENCIA [label=" 1 : N"];
+  USUARIO -> ZONA_ALERTA [label=" 1 : N"];
+  USUARIO -> DISPOSITIVO [label=" 1 : N"];
+}

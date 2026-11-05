@@ -1,0 +1,17 @@
+digraph DEP {
+  rankdir=LR; nodesep=0.6; ranksep=1.4; fontname="Helvetica"; compound=true;
+  node [fontname="Helvetica", fontsize=10, style=filled]; edge [fontname="Helvetica", fontsize=9];
+
+  subgraph cluster_tab { label="«dispositivo»\nTablet Android (prueba por USB)"; style="rounded,filled"; fillcolor="#F0FDF4"; color="#16A34A";
+    app [shape=component, label="Civic Security\n(APK Flutter)", fillcolor="#DCFCE7", color="#16A34A"]; }
+  subgraph cluster_lap { label="«nodo de desarrollo»\nLaptop Ubuntu 24.04"; style="rounded,filled"; fillcolor="#EFF6FF"; color="#2563EB";
+    phx [shape=component, label="Phoenix API\n127.0.0.1:4000", fillcolor="#DBEAFE", color="#2563EB"];
+    subgraph cluster_dock { label="«contenedor» Docker"; style="rounded,filled"; fillcolor="#DCFCE7"; color="#16A34A";
+      pg [shape=cylinder, label="PostgreSQL + PostGIS\n127.0.0.1:5432", fillcolor="white", color="#16A34A"]; } }
+  subgraph cluster_net { label="Internet"; style="rounded,filled"; fillcolor="#FFFBEB"; color="#B45309";
+    osm [shape=component, label="tile.openstreetmap.org", fillcolor="#FEF3C7", color="#B45309"]; }
+
+  app -> phx [label="USB · adb reverse tcp:4000\nHTTP/JSON (solo en desarrollo)", dir=both];
+  phx -> pg [label="SQL (solo localhost)"];
+  app -> osm [label="HTTPS (teselas del mapa)"];
+}
