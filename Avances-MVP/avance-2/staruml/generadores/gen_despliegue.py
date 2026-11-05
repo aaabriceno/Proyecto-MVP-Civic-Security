@@ -1,0 +1,15 @@
+import sys
+from boxes import *
+d = Diagram("UMLDeploymentDiagram", "Despliegue (entorno de pruebas)", "Civic Security - Despliegue")
+d.box("UMLNode", "tab", "Tablet Android (prueba por USB)", 30, 40, 300, 170, planned=False, fill="#f0fdf4")
+d.box("UMLComponent", "app", "App Civic Security (APK Flutter)", 55, 110, 250, 70, planned=False, container="tab")
+d.box("UMLNode", "lap", "Laptop de desarrollo (Ubuntu 24.04)", 700, 40, 480, 330, fill="#eff6ff", line=BLUE_LINE)
+d.box("UMLComponent", "api", "API Phoenix (Elixir)\n127.0.0.1:4000", 725, 110, 250, 70, planned=False, container="lap")
+d.box("UMLNode", "dock", "Contenedor Docker", 725, 220, 430, 120, fill=GREEN_FILL, line=GREEN_LINE, container="lap")
+d.box("UMLComponent", "pg", "PostgreSQL 17 + PostGIS 3.5\n127.0.0.1:5432", 760, 270, 360, 55, planned=False, container="dock")
+d.box("UMLNode", "net", "Internet", 30, 300, 300, 120, fill="#fffbeb", line=AMBER_LINE)
+d.box("UMLComponent", "osm", "tile.openstreetmap.org (teselas del mapa)", 55, 350, 250, 55, planned=None, container="net", fill=AMBER_FILL, line=AMBER_LINE)
+d.edge("UMLCommunicationPath", "app", "api", "USB: adb reverse tcp:4000 (HTTP/JSON)", "R", "L")
+d.edge("UMLCommunicationPath", "api", "pg", "SQL (solo localhost)", "B", "T", mid=None)
+d.edge("UMLCommunicationPath", "app", "osm", "HTTPS (teselas)", "B", "T")
+d.write(sys.argv[1])
