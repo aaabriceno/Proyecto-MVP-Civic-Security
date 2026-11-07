@@ -1,0 +1,37 @@
+# Dependabot abre un pull request cuando sale una versión nueva (o un parche de seguridad)
+# de una dependencia. CI corre sobre ese PR: si los tests pasan, se puede aceptar con
+# confianza; si fallan, se ve antes de que el cambio llegue a main.
+version: 2
+
+updates:
+  - package-ecosystem: mix
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      mix-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pub
+    directory: /app
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      pub-minor-patch:
+        update-types: [minor, patch]
+
+  # Mantiene al día las acciones fijadas por SHA (y su comentario de versión).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directory: /infra
+    schedule:
+      interval: weekly

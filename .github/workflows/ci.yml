@@ -1,0 +1,138 @@
+name: CI
+
+# Qué hace: repite en un servidor limpio las mismas revisiones que corrimos a mano
+# (docs/seguridad-revision-1.md). Si algo falla, el cambio no debe unirse a main.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Principio de mínimo privilegio: el token solo puede LEER el repositorio.
+permissions:
+  contents: read
+
+# Si subes otro commit a la misma rama, cancela la corrida anterior (ahorra minutos).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Las acciones de terceros van fijadas por SHA de commit (un tag como v4 puede moverse;
+# un SHA no). El comentario indica la versión; Dependabot las actualiza solo.
+jobs:
+  backend:
+    name: Backend (Elixir)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      MIX_ENV: test
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      # Misma imagen que infra/docker-compose.yml: PostgreSQL 17 + PostGIS 3.5.
+      db:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - id: beam
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          otp-version: "26"
+          elixir-version: "1.17.3"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            backend/deps
+            backend/_build
+          key: mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-ex${{ steps.beam.outputs.elixir-version }}-${{ hashFiles('backend/mix.lock') }}
+          restore-keys: |
+            mix-${{ runner.os }}-otp${{ steps.beam.outputs.otp-version }}-ex${{ steps.beam.outputs.elixir-version }}-
+
+      - name: Dependencias
+        run: mix deps.get
+
+      - name: Formato
+        run: mix format --check-formatted
+
+      - name: Compila sin avisos
+        run: mix compile --warnings-as-errors
+
+      - name: Dependencias sin usar en mix.lock
+        run: mix deps.unlock --check-unused
+
+      - name: Tests (crea y migra la BD de prueba)
+        run: mix test
+
+      - name: Análisis de seguridad (Sobelow)
+        run: mix sobelow --exit
+
+      - name: Vulnerabilidades en dependencias
+        run: mix deps.audit
+
+      - name: Paquetes Hex retirados
+        run: mix hex.audit
+
+  app:
+    name: App (Flutter)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.44.5"
+          cache: true
+
+      - name: Dependencias
+        run: flutter pub get
+
+      - name: Formato
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Análisis estático
+        run: flutter analyze
+
+      - name: Tests
+        run: flutter test
+
+  secretos:
+    name: Secretos (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # fetch-depth 0: gitleaks revisa TODO el historial, no solo el último commit
+      # (un secreto borrado después sigue visible en el historial de un repo público).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Imagen oficial v8.30.1 fijada por digest. Los falsos positivos conocidos están
+      # en .gitleaksignore, uno por uno, con su justificación.
+      - name: Escanea historial
+        run: >-
+          docker run --rm -v "$PWD:/repo:ro"
+          ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git /repo --redact --no-banner --verbose

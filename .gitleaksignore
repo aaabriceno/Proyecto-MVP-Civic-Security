@@ -1,0 +1,13 @@
+# Falsos positivos de gitleaks, revisados a mano el 2026-11-07.
+# Cada línea es la huella exacta de UN hallazgo (commit:archivo:regla:línea): si alguien
+# agrega otro secreto en esos mismos archivos, gitleaks SÍ lo detecta.
+
+# secret_key_base de DESARROLLO. Solo vale en la laptop de cada integrante;
+# producción lo exige por variable de entorno (backend/config/runtime.exs).
+967f7c3c492ec81399f6b508785aff438c71a0ef:backend/config/dev.exs:generic-api-key:26
+
+# secret_key_base de PRUEBAS (el servidor no se levanta en test).
+967f7c3c492ec81399f6b508785aff438c71a0ef:backend/config/test.exs:generic-api-key:20
+
+# UUID inventado como Idempotency-Key en un test de la app (no es una credencial).
+f8ce5fe07bc30f3c441b4fb29b0f7150c333f7a2:app/test/features/incident/http_incident_repository_test.dart:generic-api-key:161
