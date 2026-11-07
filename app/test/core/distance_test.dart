@@ -11,12 +11,20 @@ void main() {
   const plaza = LatLng(-16.3989, -71.5370);
 
   test('Plaza de Armas -> Alto Selva Alegre: 3 208 m según PostGIS', () {
-    final m = distance.as(LengthUnit.Meter, plaza, const LatLng(-16.3750, -71.5200));
+    final m = distance.as(
+      LengthUnit.Meter,
+      plaza,
+      const LatLng(-16.3750, -71.5200),
+    );
     expect(m, closeTo(3208, 3));
   });
 
   test('Plaza de Armas -> UCSP: 431 m según PostGIS', () {
-    final m = distance.as(LengthUnit.Meter, plaza, const LatLng(-16.3963, -71.5340));
+    final m = distance.as(
+      LengthUnit.Meter,
+      plaza,
+      const LatLng(-16.3963, -71.5340),
+    );
     expect(m, closeTo(431, 2));
   });
 
@@ -32,7 +40,10 @@ void main() {
   test('es simétrica y la distancia a uno mismo es 0', () {
     const a = LatLng(-16.40, -71.53);
     const b = LatLng(-16.43, -71.50);
-    expect(distance.as(LengthUnit.Meter, a, b), distance.as(LengthUnit.Meter, b, a));
+    expect(
+      distance.as(LengthUnit.Meter, a, b),
+      distance.as(LengthUnit.Meter, b, a),
+    );
     expect(distance.as(LengthUnit.Meter, a, a), 0);
   });
 }
