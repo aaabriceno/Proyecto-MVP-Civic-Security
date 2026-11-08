@@ -7,6 +7,10 @@ defmodule Civic.Application do
 
   @impl true
   def start(_type, _args) do
+    # Falla al arrancar (en vez de a mitad de un registro) si las claves de
+    # privacidad faltan, son cortas o se repiten
+    :ok = Civic.Privacy.validate_config!()
+
     children = [
       CivicWeb.Telemetry,
       Civic.Repo,

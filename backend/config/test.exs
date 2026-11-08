@@ -30,6 +30,14 @@ config :phoenix, :plug_init_mode, :runtime
 config :phoenix,
   sort_verified_routes_query_params: true
 
+# Claves de PRUEBA de Civic.Privacy (derivadas, sin secretos en el repo)
+config :civic, Civic.Privacy,
+  keys: %{
+    {:verif, 1} => :crypto.hash(:sha256, "civic-test:verif:v1"),
+    {:rep, 1} => :crypto.hash(:sha256, "civic-test:rep:v1"),
+    {:vote, 1} => :crypto.hash(:sha256, "civic-test:vote:v1")
+  }
+
 # Límites muy altos: solo los tests de rate limiting los reducen a propósito
 config :civic, CivicWeb.RateLimit,
   write: {100_000, :timer.minutes(1)},

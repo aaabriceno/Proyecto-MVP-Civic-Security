@@ -44,4 +44,9 @@ config :civic, CivicWeb.RateLimit,
   read: {600, :timer.minutes(1)},
   socket: {120, :timer.minutes(1)}
 
+# Versión de clave vigente para cada propósito de Civic.Privacy. Las claves en sí
+# NO van aquí: en dev/test se derivan en su archivo y en producción vienen de
+# variables de entorno (config/runtime.exs).
+config :civic, Civic.Privacy, current: %{verif: 1, rep: 1, vote: 1}
+
 import_config "#{config_env()}.exs"
