@@ -9,6 +9,7 @@ class ApiFailure implements Exception {
     required this.code,
     required this.message,
     this.fields = const {},
+    this.retryAfter,
   });
 
   /// Sin conexión, tiempo agotado o servidor caído.
@@ -26,7 +27,15 @@ class ApiFailure implements Exception {
 
   factory ApiFailure.fromDio(DioException e) {
     final response = e.response;
-    if (response == null) return const ApiFailure.network();
+    if (response == null) {
+      // Dio envuelve el error de leer un cuerpo que no es JSON en un
+      // DioException sin respuesta: el servidor sí contestó, no es falta de red
+      return e.error is FormatException
+          ? const ApiFailure.invalidResponse()
+          : const ApiFailure.network();
+    }
+
+    final retryAfter = _parseRetryAfter(response.headers.value('retry-after'));
 
     final data = response.data;
     if (data is Map && data['error'] is Map) {
@@ -37,6 +46,7 @@ class ApiFailure implements Exception {
             ? error['message'] as String
             : 'El servidor rechazó la solicitud',
         fields: _parseFields(error['fields']),
+        retryAfter: retryAfter,
       );
     }
 
@@ -45,6 +55,7 @@ class ApiFailure implements Exception {
     return ApiFailure(
       code: 'http_$status',
       message: 'El servidor respondió con un error ($status)',
+      retryAfter: retryAfter,
     );
   }
 
@@ -53,6 +64,17 @@ class ApiFailure implements Exception {
 
   /// Errores por campo de los 422, p. ej. `{"ubicacion": ["..."]}`.
   final Map<String, List<String>> fields;
+
+  /// Cuánto esperar antes de reintentar, si el servidor lo indicó con la
+  /// cabecera `retry-after` (un 429 o un 503). Sirve para la cuenta regresiva
+  /// de una cuenta bloqueada.
+  final Duration? retryAfter;
+
+  /// Solo acepta segundos enteros positivos; cualquier otra cosa es `null`.
+  static Duration? _parseRetryAfter(String? raw) {
+    final seconds = int.tryParse(raw?.trim() ?? '');
+    return seconds != null && seconds > 0 ? Duration(seconds: seconds) : null;
+  }
 
   static Map<String, List<String>> _parseFields(Object? raw) {
     if (raw is! Map) return const {};
