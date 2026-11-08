@@ -42,8 +42,14 @@ config :civic, Civic.Privacy,
     {:vote, 1} => :crypto.hash(:sha256, "civic-test:vote:v1")
   }
 
+# Tope muy alto: solo los tests del semáforo lo reducen a propósito
+config :civic, Civic.HashGate, max_concurrent: 1_000
+
 # Límites muy altos: solo los tests de rate limiting los reducen a propósito
 config :civic, CivicWeb.RateLimit,
   write: {100_000, :timer.minutes(1)},
   read: {100_000, :timer.minutes(1)},
-  socket: {100_000, :timer.minutes(1)}
+  socket: {100_000, :timer.minutes(1)},
+  register: {100_000, :timer.minutes(1)},
+  login: {100_000, :timer.minutes(1)},
+  refresh: {100_000, :timer.minutes(1)}

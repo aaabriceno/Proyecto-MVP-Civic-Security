@@ -48,6 +48,17 @@ defmodule Civic.Accounts do
     end
   end
 
+  @doc "La cuenta con ese id, o `nil` si no existe o el id no tiene forma de UUID."
+  @spec get_user(term()) :: User.t() | nil
+  def get_user(id) when is_binary(id) do
+    case Ecto.UUID.cast(id) do
+      {:ok, uuid} -> Repo.get(User, uuid)
+      :error -> nil
+    end
+  end
+
+  def get_user(_id), do: nil
+
   @doc """
   Verifica alias y contraseña.
 

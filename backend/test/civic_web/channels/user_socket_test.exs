@@ -16,15 +16,21 @@ defmodule CivicWeb.UserSocketTest do
     connect(UserSocket, %{}, connect_info: info)
   end
 
-  test "limita las conexiones por IP" do
+  # Cada IP se usa una sola vez: el contador vive 60 s en memoria y una IP fija
+  # quedaría bloqueada al repetir la suite dentro de la misma ejecución
+  defp unique_ip do
     n = :erlang.unique_integer([:positive])
-    ip = {10, 2, rem(n, 250) + 1, rem(div(n, 250), 250) + 1}
+    {10, rem(n, 250) + 1, rem(div(n, 250), 250) + 1, rem(div(n, 62_500), 250) + 1}
+  end
+
+  test "limita las conexiones por IP" do
+    ip = unique_ip()
 
     assert {:ok, _} = connect_from(ip)
     assert {:ok, _} = connect_from(ip)
     assert :error = connect_from(ip)
 
     # Otra IP no se ve afectada
-    assert {:ok, _} = connect_from({10, 3, 3, 3})
+    assert {:ok, _} = connect_from(unique_ip())
   end
 end

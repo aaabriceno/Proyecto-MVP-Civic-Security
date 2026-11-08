@@ -30,6 +30,21 @@ defmodule Civic.AccountsTest do
     end
   end
 
+  describe "get_user/1" do
+    test "devuelve la cuenta por su id" do
+      user = register!()
+
+      assert %User{id: id} = Accounts.get_user(user.id)
+      assert id == user.id
+    end
+
+    test "devuelve nil si no existe o si el id no tiene forma de UUID" do
+      assert Accounts.get_user(Ecto.UUID.generate()) == nil
+      assert Accounts.get_user("no-es-uuid") == nil
+      assert Accounts.get_user(nil) == nil
+    end
+  end
+
   describe "register/1" do
     test "crea una cuenta de nivel invitado con la contraseña en Argon2id" do
       assert {:ok, %User{} = user} = Accounts.register(attrs())

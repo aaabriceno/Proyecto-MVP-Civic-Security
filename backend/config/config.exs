@@ -33,16 +33,33 @@ config :logger, :default_formatter,
 config :phoenix, :json_library, Jason
 
 # Nunca escribir estos parámetros en los logs (se muestran como [FILTERED])
-config :phoenix, :filter_parameters, ["password", "dni"]
+# Phoenix oculta en los logs todo parámetro cuya clave CONTENGA alguna de estas
+# palabras: "token" cubre refresh_token, access_token y futuros (p. ej. fcm_token)
+config :phoenix, :filter_parameters, ["password", "dni", "token"]
 
-# Límites por cliente: {máximo de solicitudes, ventana en ms}. Sin cuentas aún,
-# el cliente es su IP, y muchos alumnos tras el wifi de la universidad
-# comparten una: por eso estos valores son GENEROSOS (solo frenan inundaciones
-# masivas). El límite estricto irá por cuenta cuando exista la autenticación.
+# Límites por cliente: {máximo de solicitudes, ventana en ms}. El cliente es su
+# IP, y muchos alumnos tras el wifi de la universidad (o tras la misma IP de un
+# operador móvil) comparten una: por eso estos valores son GENEROSOS. Solo
+# frenan inundaciones masivas; no son la defensa contra el abuso. Esa la dan el
+# bloqueo por cuenta, el costo de Argon2id y la verificación por DNI.
+# `refresh` también cubre el cierre de sesión.
 config :civic, CivicWeb.RateLimit,
   write: {120, :timer.minutes(10)},
   read: {600, :timer.minutes(1)},
-  socket: {120, :timer.minutes(1)}
+  socket: {120, :timer.minutes(1)},
+  register: {100, :timer.hours(1)},
+  login: {120, :timer.minutes(10)},
+  refresh: {200, :timer.minutes(10)}
+
+# Cuántos registros/inicios de sesión se atienden a la vez (ver Civic.HashGate).
+# Pasado el tope se responde 503 al instante. Con ~50 ms por hash, 8 a la vez
+# cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
+config :civic, Civic.HashGate, max_concurrent: 8
+
+# Cuántos registros/inicios de sesión se atienden a la vez (ver Civic.HashGate).
+# Pasado el tope se responde 503 al instante. Con ~50 ms por hash, 8 a la vez
+# cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
+config :civic, Civic.HashGate, max_concurrent: 8
 
 # Argon2id para las contraseñas (type 2 = argon2id). m_cost es el exponente de
 # KiB: 15 -> 2^15 KiB = 32 MiB. Con t=3 y p=1 supera el mínimo de OWASP
