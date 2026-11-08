@@ -49,4 +49,7 @@ config :civic, Civic.HashGate, max_concurrent: 1_000
 config :civic, CivicWeb.RateLimit,
   write: {100_000, :timer.minutes(1)},
   read: {100_000, :timer.minutes(1)},
-  socket: {100_000, :timer.minutes(1)}
+  socket: {100_000, :timer.minutes(1)},
+  register: {100_000, :timer.minutes(1)},
+  login: {100_000, :timer.minutes(1)},
+  refresh: {100_000, :timer.minutes(1)}

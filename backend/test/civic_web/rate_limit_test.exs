@@ -14,7 +14,12 @@ defmodule CivicWeb.RateLimitTest do
     Application.put_env(:civic, CivicWeb.RateLimit,
       write: {3, 60_000},
       read: {5, 60_000},
-      socket: {2, 60_000}
+      socket: {2, 60_000},
+      # Ventana de una hora: el contador es de ventana fija y, si el minuto
+      # cambiara a mitad de un test, se reiniciaría y el test fallaría sin motivo
+      register: {2, :timer.hours(1)},
+      login: {2, :timer.hours(1)},
+      refresh: {2, :timer.hours(1)}
     )
 
     on_exit(fn ->
@@ -29,6 +34,12 @@ defmodule CivicWeb.RateLimitTest do
   defp unique_ip do
     n = :erlang.unique_integer([:positive])
     {10, rem(n, 250) + 1, rem(div(n, 250), 250) + 1, rem(div(n, 62_500), 250) + 1}
+  end
+
+  # Un cliente "detrás del proxy" distinto en cada llamada (el contador vive en memoria)
+  defp unique_client do
+    n = :erlang.unique_integer([:positive])
+    "198.#{rem(n, 250) + 1}.#{rem(div(n, 250), 250) + 1}.#{rem(div(n, 62_500), 250) + 1}"
   end
 
   defp post_incident(conn, ip, headers \\ []) do
@@ -72,6 +83,64 @@ defmodule CivicWeb.RateLimitTest do
     assert post_incident(build_conn(), otra).status == 201
   end
 
+  defp auth_post(ip, path, body) do
+    %{build_conn() | remote_ip: ip}
+    |> put_req_header("content-type", "application/json")
+    |> post(path, body)
+  end
+
+  defp new_account(n),
+    do: %{
+      "alias" => "Limite-#{:erlang.unique_integer([:positive])}-#{n}",
+      "password" => "una contraseña larga y segura",
+      "acepta_consentimiento" => true
+    }
+
+  describe "endpoints de cuentas" do
+    test "register: pasado el límite responde 429 y la cuenta no se crea" do
+      ip = unique_ip()
+
+      for n <- 1..2,
+          do: assert(auth_post(ip, ~p"/v1/auth/register", new_account(n)).status == 201)
+
+      bloqueada = new_account(3)
+      conn = auth_post(ip, ~p"/v1/auth/register", bloqueada)
+
+      assert %{"error" => %{"code" => "rate_limited"}} = json_response(conn, 429)
+      assert [_] = get_resp_header(conn, "retry-after")
+      refute Repo.get_by(Civic.Accounts.User, alias: bloqueada["alias"])
+    end
+
+    test "login: pasado el límite responde 429 (distinto del bloqueo de la cuenta)" do
+      ip = unique_ip()
+      body = %{"alias" => "No-Existe-1", "password" => "una contraseña larga y segura"}
+
+      for _ <- 1..2, do: assert(auth_post(ip, ~p"/v1/auth/login", body).status == 401)
+
+      conn = auth_post(ip, ~p"/v1/auth/login", body)
+      assert %{"error" => %{"code" => "rate_limited"}} = json_response(conn, 429)
+    end
+
+    test "refresh y logout comparten límite" do
+      ip = unique_ip()
+
+      assert auth_post(ip, ~p"/v1/auth/refresh", %{"refresh_token" => "x"}).status == 401
+      assert auth_post(ip, ~p"/v1/auth/logout", %{"refresh_token" => "x"}).status == 204
+
+      assert auth_post(ip, ~p"/v1/auth/refresh", %{"refresh_token" => "x"}).status == 429
+    end
+
+    test "cada acción tiene su propio contador" do
+      ip = unique_ip()
+      for n <- 1..2, do: auth_post(ip, ~p"/v1/auth/register", new_account(n))
+      assert auth_post(ip, ~p"/v1/auth/register", new_account(3)).status == 429
+
+      # Agotar el registro no afecta al login desde la misma IP
+      body = %{"alias" => "No-Existe-1", "password" => "una contraseña larga y segura"}
+      assert auth_post(ip, ~p"/v1/auth/login", body).status == 401
+    end
+  end
+
   test "las lecturas también se limitan", %{conn: conn} do
     ip = unique_ip()
     url = ~p"/v1/map/snapshot?bbox=-71.75,-16.60,-71.40,-16.25"
@@ -99,11 +168,13 @@ defmodule CivicWeb.RateLimitTest do
   test "con un proxy de confianza configurado se usa su cabecera", %{conn: conn} do
     Application.put_env(:civic, :client_ip_header, "x-real-ip")
     proxy = unique_ip()
+    uno = unique_client()
+    otro = unique_client()
 
-    for _ <- 1..3, do: post_incident(conn, proxy, [{"x-real-ip", "9.9.9.1"}])
+    for _ <- 1..3, do: post_incident(conn, proxy, [{"x-real-ip", uno}])
 
     # Todos llegan por la misma IP del proxy, pero son clientes distintos
-    assert post_incident(build_conn(), proxy, [{"x-real-ip", "9.9.9.1"}]).status == 429
-    assert post_incident(build_conn(), proxy, [{"x-real-ip", "9.9.9.2"}]).status == 201
+    assert post_incident(build_conn(), proxy, [{"x-real-ip", uno}]).status == 429
+    assert post_incident(build_conn(), proxy, [{"x-real-ip", otro}]).status == 201
   end
 end
