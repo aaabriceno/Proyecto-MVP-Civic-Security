@@ -56,11 +56,6 @@ config :civic, CivicWeb.RateLimit,
 # cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
 config :civic, Civic.HashGate, max_concurrent: 8
 
-# Cuántos registros/inicios de sesión se atienden a la vez (ver Civic.HashGate).
-# Pasado el tope se responde 503 al instante. Con ~50 ms por hash, 8 a la vez
-# cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
-config :civic, Civic.HashGate, max_concurrent: 8
-
 # Argon2id para las contraseñas (type 2 = argon2id). m_cost es el exponente de
 # KiB: 15 -> 2^15 KiB = 32 MiB. Con t=3 y p=1 supera el mínimo de OWASP
 # (19 MiB, t=2, p=1). Subirlo hace cada intento de adivinar más caro para un
