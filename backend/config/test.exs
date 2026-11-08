@@ -30,6 +30,10 @@ config :phoenix, :plug_init_mode, :runtime
 config :phoenix,
   sort_verified_routes_query_params: true
 
+# Argon2 barato SOLO en pruebas (si no, cada test tardaría ~100 ms). El
+# formato del hash es el mismo; los valores reales están en config.exs.
+config :argon2_elixir, t_cost: 1, m_cost: 8
+
 # Claves de PRUEBA de Civic.Privacy (derivadas, sin secretos en el repo)
 config :civic, Civic.Privacy,
   keys: %{

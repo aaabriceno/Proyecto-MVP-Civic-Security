@@ -7,6 +7,7 @@ defmodule Civic.MixProject do
       version: "0.1.0",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
+      build_path: build_path(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
@@ -30,6 +31,18 @@ defmodule Civic.MixProject do
     ]
   end
 
+  # La librería nativa de Argon2 no soporta rutas con espacios: su Makefile no
+  # las entrecomilla y parte la ruta en dos. Si la carpeta del proyecto tiene un
+  # espacio (p. ej. "Semestre 2026-2"), se compila en ~/.cache; en CI y en
+  # cualquier ruta sin espacios se usa el _build de siempre.
+  defp build_path do
+    if String.contains?(File.cwd!(), " ") do
+      Path.join([System.user_home!(), ".cache", "civic_security", "_build"])
+    else
+      "_build"
+    end
+  end
+
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
@@ -50,6 +63,7 @@ defmodule Civic.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:hammer, "~> 7.5"},
+      {:argon2_elixir, "~> 4.1"},
       {:sobelow, "~> 0.18", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
