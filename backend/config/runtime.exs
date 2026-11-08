@@ -52,6 +52,30 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
+  # Claves de Civic.Privacy (HMAC de DNI y tokens por incidente). Tres claves
+  # INDEPENDIENTES de 32 bytes en base64. Nunca en el repo ni en la base de datos.
+  # Genera cada una con:  openssl rand -base64 32
+  privacy_key = fn name ->
+    value =
+      System.get_env(name) ||
+        raise """
+        environment variable #{name} is missing.
+        Generate one with: openssl rand -base64 32
+        """
+
+    case Base.decode64(String.trim(value)) do
+      {:ok, key} -> key
+      :error -> raise "environment variable #{name} must be base64"
+    end
+  end
+
+  config :civic, Civic.Privacy,
+    keys: %{
+      {:verif, 1} => privacy_key.("CIVIC_KEY_VERIF_V1"),
+      {:rep, 1} => privacy_key.("CIVIC_KEY_REP_V1"),
+      {:vote, 1} => privacy_key.("CIVIC_KEY_VOTE_V1")
+    }
+
   host = System.get_env("PHX_HOST") || "example.com"
 
   # Solo si hay un proxy que SOBRESCRIBE esta cabecera (p. ej. fly-client-ip en

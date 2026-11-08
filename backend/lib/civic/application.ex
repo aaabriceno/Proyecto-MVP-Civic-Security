@@ -7,12 +7,17 @@ defmodule Civic.Application do
 
   @impl true
   def start(_type, _args) do
+    # Falla al arrancar (en vez de a mitad de un registro) si las claves de
+    # privacidad faltan, son cortas o se repiten
+    :ok = Civic.Privacy.validate_config!()
+
     children = [
       CivicWeb.Telemetry,
       Civic.Repo,
       {DNSCluster, query: Application.get_env(:civic, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Civic.PubSub},
       {Civic.RateLimit, clean_period: :timer.minutes(5)},
+      Civic.HashGate,
       # Start a worker by calling: Civic.Worker.start_link(arg)
       # {Civic.Worker, arg},
       # Start to serve requests, typically the last entry

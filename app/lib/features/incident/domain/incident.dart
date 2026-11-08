@@ -116,6 +116,14 @@ class Bbox {
   final double maxLng;
   final double maxLat;
 
+  /// ¿El punto cae dentro del rectángulo? (el borde cuenta como dentro, igual
+  /// que `ST_Intersects` en el servidor).
+  bool contains(LatLng point) =>
+      point.longitude >= minLng &&
+      point.longitude <= maxLng &&
+      point.latitude >= minLat &&
+      point.latitude <= maxLat;
+
   /// `minLng,minLat,maxLng,maxLat` (longitud primero, como PostGIS), con 6
   /// decimales (~10 cm) y sin notación científica.
   String toQuery() =>

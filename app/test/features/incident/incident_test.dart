@@ -113,5 +113,28 @@ void main() {
         (-90.0, -180.0, 90.0, 180.0),
       );
     });
+
+    test('contains: dentro, fuera y en el borde (borde incluido)', () {
+      const b = Bbox(
+        minLng: -71.55,
+        minLat: -16.41,
+        maxLng: -71.50,
+        maxLat: -16.38,
+      );
+      expect(b.contains(const LatLng(-16.40, -71.52)), isTrue);
+      expect(b.contains(const LatLng(-16.41, -71.55)), isTrue, reason: 'borde');
+      expect(
+        b.contains(const LatLng(-16.37, -71.52)),
+        isFalse,
+        reason: 'norte',
+      );
+      expect(b.contains(const LatLng(-16.40, -71.49)), isFalse, reason: 'este');
+      expect(b.contains(const LatLng(-16.42, -71.52)), isFalse, reason: 'sur');
+      expect(
+        b.contains(const LatLng(-16.40, -71.56)),
+        isFalse,
+        reason: 'oeste',
+      );
+    });
   });
 }

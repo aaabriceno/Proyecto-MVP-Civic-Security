@@ -13,6 +13,8 @@ import '../../report/presentation/report_screen.dart';
 import 'incident_detail.dart';
 import 'incident_pin.dart';
 import 'incidents_sheet.dart';
+import 'live_map_controller.dart';
+import 'live_status_chip.dart';
 import 'map_incidents_controller.dart';
 import 'map_providers.dart';
 import 'type_filter_bar.dart';
@@ -51,6 +53,9 @@ class _MapScreenState extends ConsumerState<MapScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Empieza a escuchar reportes nuevos. Si la conexión se cae, el canal
+    // reintenta solo mientras la pantalla esté abierta.
+    ref.read(liveMapProvider.notifier).start();
   }
 
   @override
@@ -62,12 +67,27 @@ class _MapScreenState extends ConsumerState<MapScreen>
     super.dispose();
   }
 
-  /// Al volver de los ajustes del sistema, reintenta si faltaba la ubicación.
+  /// - En segundo plano (`paused`) corta el tiempo real: Android igual mata
+  ///   el socket y mantenerlo gasta batería. Al volver (`resumed`) reconecta, y
+  ///   al quedar conectado se recarga el snapshot (ver [LiveMapController]).
+  ///   `inactive` NO corta: ocurre al mostrar el diálogo de permisos.
+  /// - Al volver de los ajustes del sistema, reintenta si faltaba la ubicación.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final location = ref.read(userLocationProvider).value;
-    if (state == AppLifecycleState.resumed && location is LocationUnavailable) {
-      ref.invalidate(userLocationProvider);
+    final live = ref.read(liveMapProvider.notifier);
+    switch (state) {
+      case AppLifecycleState.paused:
+        live.stop();
+      case AppLifecycleState.resumed:
+        live.start();
+        final location = ref.read(userLocationProvider).value;
+        if (location is LocationUnavailable) {
+          ref.invalidate(userLocationProvider);
+        }
+      case AppLifecycleState.inactive ||
+          AppLifecycleState.hidden ||
+          AppLifecycleState.detached:
+        break;
     }
   }
 
@@ -160,6 +180,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
     final data = ref.watch(mapIncidentsProvider);
     final incidents = ref.watch(visibleIncidentsProvider);
     final filter = ref.watch(typeFilterProvider);
+    final live = ref.watch(liveMapProvider);
 
     return Scaffold(
       body: Stack(
@@ -229,6 +250,13 @@ class _MapScreenState extends ConsumerState<MapScreen>
                   TypeFilterBar(
                     selected: filter,
                     onSelected: ref.read(typeFilterProvider.notifier).select,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: LiveStatusChip(status: live),
+                    ),
                   ),
                   _locationBanner(location),
                   _dataBanner(data),

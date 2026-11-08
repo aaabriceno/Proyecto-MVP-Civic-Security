@@ -50,6 +50,15 @@ config :civic, CivicWeb.Endpoint,
 # configured to run both http and https servers on
 # different ports.
 
+# Claves de DESARROLLO de Civic.Privacy: se derivan aquí y no valen nada fuera de
+# tu laptop. Producción exige claves reales por variable de entorno.
+config :civic, Civic.Privacy,
+  keys: %{
+    {:verif, 1} => :crypto.hash(:sha256, "civic-dev:verif:v1"),
+    {:rep, 1} => :crypto.hash(:sha256, "civic-dev:rep:v1"),
+    {:vote, 1} => :crypto.hash(:sha256, "civic-dev:vote:v1")
+  }
+
 # Enable dev routes for dashboard and mailbox
 config :civic, dev_routes: true
 
