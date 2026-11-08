@@ -42,6 +42,10 @@ config :civic, Civic.Privacy,
     {:vote, 1} => :crypto.hash(:sha256, "civic-test:vote:v1")
   }
 
+# Sin limpieza por temporizador: los tests usan relojes inventados y una limpieza
+# con la hora real podría borrar entradas a mitad de un test
+config :civic, Civic.Accounts.RefreshReplay, sweep_every: :never, max_entries: 100_000
+
 # Tope muy alto: solo los tests del semáforo lo reducen a propósito
 config :civic, Civic.HashGate, max_concurrent: 1_000
 

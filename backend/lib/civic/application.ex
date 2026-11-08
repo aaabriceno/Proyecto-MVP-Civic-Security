@@ -18,6 +18,7 @@ defmodule Civic.Application do
       {Phoenix.PubSub, name: Civic.PubSub},
       {Civic.RateLimit, clean_period: :timer.minutes(5)},
       Civic.HashGate,
+      Civic.Accounts.RefreshReplay,
       # Start a worker by calling: Civic.Worker.start_link(arg)
       # {Civic.Worker, arg},
       # Start to serve requests, typically the last entry
