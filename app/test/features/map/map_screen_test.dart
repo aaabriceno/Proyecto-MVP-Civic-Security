@@ -7,6 +7,8 @@ import 'package:civic_security/core/network/api_failure.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
 import 'package:civic_security/features/report/domain/new_incident.dart';
+import 'package:civic_security/core/realtime/phoenix_channel.dart';
+import 'package:civic_security/features/map/data/incident_stream.dart';
 import 'package:civic_security/features/map/presentation/map_providers.dart';
 import 'package:civic_security/features/map/presentation/map_screen.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +16,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
+
+import 'fake_incident_stream.dart';
 
 /// Posición dentro de Arequipa (Paucarpata), lejos del centro de la vista inicial.
 const _enArequipa = LatLng(-16.4300, -71.5050);
@@ -103,6 +107,7 @@ Future<MapController> _pumpMap(
   WidgetTester tester,
   _FakeLocationService service, {
   _FakeRepo? repo,
+  FakeIncidentStream? stream,
 }) async {
   // Pantalla alta (la fuente de los tests es más ancha que la real)
   tester.view.physicalSize = const Size(1000, 1600);
@@ -115,6 +120,10 @@ Future<MapController> _pumpMap(
       overrides: [
         locationServiceProvider.overrideWithValue(service),
         incidentRepositoryProvider.overrideWithValue(repo ?? _FakeRepo()),
+        // Nunca abrir un WebSocket real en los tests
+        incidentStreamProvider.overrideWithValue(
+          stream ?? FakeIncidentStream(),
+        ),
         tileProviderProvider.overrideWithValue(_BlankTileProvider()),
       ],
       child: MaterialApp(home: MapScreen(mapController: controller)),
@@ -126,6 +135,12 @@ Future<MapController> _pumpMap(
   await tester.pump(const Duration(milliseconds: 600));
   await tester.pump();
   return controller;
+}
+
+/// Entrega un evento del stream falso y deja que la pantalla se reconstruya.
+Future<void> _deliver(WidgetTester tester) async {
+  await tester.pump(); // el stream entrega el evento (microtask)
+  await tester.pump(); // la pantalla se reconstruye con el nuevo estado
 }
 
 void main() {
@@ -460,6 +475,90 @@ void main() {
 
       expect(find.text('¿Qué está pasando?'), findsNothing);
       expect(find.byKey(const Key('boton-reportar')), findsOneWidget);
+    });
+  });
+
+  group('tiempo real', () {
+    final denied = _FakeLocationService(
+      const LocationUnavailable(LocationFailure.denied),
+    );
+
+    testWidgets('al abrir la pantalla empieza a escuchar', (tester) async {
+      final stream = FakeIncidentStream();
+      await _pumpMap(tester, denied, stream: stream);
+
+      expect(stream.starts, 1);
+    });
+
+    testWidgets('el indicador sigue el estado de la conexión', (tester) async {
+      final stream = FakeIncidentStream();
+      await _pumpMap(tester, denied, stream: stream);
+
+      stream.setStatus(RealtimeStatus.connecting);
+      await _deliver(tester);
+      expect(find.text('Conectando…'), findsOneWidget);
+
+      stream.setStatus(RealtimeStatus.connected);
+      await _deliver(tester);
+      expect(find.text('En vivo'), findsOneWidget);
+
+      stream.setStatus(RealtimeStatus.disconnected);
+      await _deliver(tester);
+      expect(find.text('Reconectando…'), findsOneWidget);
+    });
+
+    testWidgets('un reporte nuevo aparece como pin sin recargar', (
+      tester,
+    ) async {
+      final stream = FakeIncidentStream();
+      final repo = _FakeRepo();
+      await _pumpMap(tester, denied, repo: repo, stream: stream);
+      expect(find.byKey(const Key('pin-nuevo')), findsNothing);
+      final loadsBefore = repo.calls.length;
+
+      stream.emit(_incident('nuevo'));
+      await _deliver(tester);
+
+      expect(find.byKey(const Key('pin-nuevo')), findsOneWidget);
+      expect(repo.calls, hasLength(loadsBefore), reason: 'sin pedir nada');
+    });
+
+    testWidgets('al quedar conectado recarga lo que pudo perderse', (
+      tester,
+    ) async {
+      final stream = FakeIncidentStream();
+      final repo = _FakeRepo();
+      await _pumpMap(tester, denied, repo: repo, stream: stream);
+      final loadsBefore = repo.calls.length;
+      repo.incidents = [_incident('llego-mientras-no-escuchaba')];
+
+      stream.setStatus(RealtimeStatus.connected);
+      await _deliver(tester);
+      await tester.pump(); // llega la respuesta del snapshot
+
+      expect(repo.calls, hasLength(loadsBefore + 1));
+      expect(
+        find.byKey(const Key('pin-llego-mientras-no-escuchaba')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('en segundo plano corta la conexión y al volver reconecta', (
+      tester,
+    ) async {
+      final stream = FakeIncidentStream();
+      await _pumpMap(tester, denied, stream: stream);
+      final binding = tester.binding;
+
+      // Un diálogo del sistema (permisos) pone la app en "inactive": no corta
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      expect(stream.stops, 0);
+
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      expect(stream.stops, 1);
+
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      expect(stream.starts, 2);
     });
   });
 
