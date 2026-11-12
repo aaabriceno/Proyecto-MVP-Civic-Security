@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:civic_security/core/geo/arequipa.dart';
 import 'package:civic_security/core/location/location_service.dart';
 import 'package:civic_security/core/network/api_failure.dart';
+import 'package:civic_security/features/auth/domain/auth_models.dart';
+import 'package:civic_security/features/auth/presentation/auth_controller.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
 import 'package:civic_security/features/report/domain/new_incident.dart';
@@ -103,11 +105,31 @@ Incident _incident(
   creadoEn: DateTime.now().toUtc().subtract(const Duration(minutes: 12)),
 );
 
+/// Sesión de mentira: el estado que el test indique y un contador de cierres.
+class _FakeAuth extends AuthController {
+  _FakeAuth(this._initial);
+
+  final AuthState _initial;
+  int logouts = 0;
+
+  @override
+  AuthState build() => _initial;
+
+  @override
+  Future<void> logout() async {
+    logouts++;
+    state = const AuthState.signedOut();
+  }
+}
+
 Future<MapController> _pumpMap(
   WidgetTester tester,
   _FakeLocationService service, {
   _FakeRepo? repo,
   FakeIncidentStream? stream,
+  _FakeAuth? auth,
+  bool readOnly = false,
+  VoidCallback? onSignIn,
 }) async {
   // Pantalla alta (la fuente de los tests es más ancha que la real)
   tester.view.physicalSize = const Size(1000, 1600);
@@ -125,8 +147,15 @@ Future<MapController> _pumpMap(
           stream ?? FakeIncidentStream(),
         ),
         tileProviderProvider.overrideWithValue(_BlankTileProvider()),
+        if (auth != null) authControllerProvider.overrideWith(() => auth),
       ],
-      child: MaterialApp(home: MapScreen(mapController: controller)),
+      child: MaterialApp(
+        home: MapScreen(
+          mapController: controller,
+          readOnly: readOnly,
+          onSignIn: onSignIn,
+        ),
+      ),
     ),
   );
   await tester.pump();
@@ -617,6 +646,108 @@ void main() {
 
       binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       expect(stream.starts, 2);
+    });
+  });
+
+  group('cuenta', () {
+    const unaCuenta = AuthUser(
+      id: '89e95dd3-b844-4c68-8186-c778448e407a',
+      alias: 'Halcon-Misti-482',
+      nivel: AuthLevel.invitado,
+    );
+    final enArequipa = _FakeLocationService(const LocationFound(_enArequipa));
+
+    testWidgets('con sesión, el botón de cuenta abre la hoja con el alias', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        enArequipa,
+        auth: _FakeAuth(const AuthState.signedIn(unaCuenta)),
+      );
+
+      await tester.tap(find.byKey(const Key('boton-cuenta')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Halcon-Misti-482'), findsOneWidget);
+      expect(find.text('Cuenta sin verificar'), findsOneWidget);
+    });
+
+    testWidgets('"Cerrar sesión" cierra la sesión y la hoja', (tester) async {
+      final auth = _FakeAuth(const AuthState.signedIn(unaCuenta));
+      await _pumpMap(tester, enArequipa, auth: auth);
+
+      await tester.tap(find.byKey(const Key('boton-cuenta')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('boton-cerrar-sesion')));
+      await tester.pumpAndSettle();
+
+      expect(auth.logouts, 1);
+      expect(find.byKey(const Key('boton-cerrar-sesion')), findsNothing);
+    });
+
+    testWidgets(
+      'sin confirmar la sesión (sin señal) lo avisa y deja usar el mapa',
+      (tester) async {
+        await _pumpMap(
+          tester,
+          enArequipa,
+          auth: _FakeAuth(const AuthState.offline()),
+        );
+
+        expect(
+          find.byKey(const Key('aviso-sesion-sin-confirmar')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('boton-reportar')), findsOneWidget);
+        expect(find.byKey(const Key('boton-cuenta')), findsOneWidget);
+      },
+    );
+
+    testWidgets('con la sesión confirmada no hay aviso', (tester) async {
+      await _pumpMap(
+        tester,
+        enArequipa,
+        auth: _FakeAuth(const AuthState.signedIn(unaCuenta)),
+      );
+
+      expect(find.byKey(const Key('aviso-sesion-sin-confirmar')), findsNothing);
+    });
+
+    testWidgets(
+      'solo lectura: no se puede reportar y se ofrece iniciar sesión',
+      (tester) async {
+        var pidioSesion = false;
+        await _pumpMap(
+          tester,
+          enArequipa,
+          readOnly: true,
+          onSignIn: () => pidioSesion = true,
+        );
+
+        expect(find.byKey(const Key('boton-reportar')), findsNothing);
+        expect(find.byKey(const Key('boton-cuenta')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('boton-iniciar-sesion-mapa')));
+
+        expect(pidioSesion, isTrue);
+      },
+    );
+
+    testWidgets('solo lectura sigue mostrando los reportes y la ubicación', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        enArequipa,
+        repo: _FakeRepo(incidents: [_incident('a')]),
+        readOnly: true,
+        onSignIn: () {},
+      );
+
+      expect(find.byKey(const Key('pin-a')), findsOneWidget);
+      expect(find.byKey(const Key('mi-ubicacion')), findsOneWidget);
+      expect(find.byKey(const Key('boton-mi-ubicacion')), findsOneWidget);
     });
   });
 

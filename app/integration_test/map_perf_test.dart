@@ -19,12 +19,13 @@
 // sintéticos y el tiempo real está apagado, para que la medición sea repetible.
 import 'dart:math';
 
-import 'package:civic_security/app/app.dart';
 import 'package:civic_security/core/location/location_service.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
 import 'package:civic_security/features/map/data/incident_stream.dart';
+import 'package:civic_security/features/map/presentation/map_screen.dart';
 import 'package:civic_security/features/report/domain/new_incident.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -122,7 +123,9 @@ void main() {
           ),
           incidentStreamProvider.overrideWithValue(FakeIncidentStream()),
         ],
-        child: const CivicApp(),
+        // Directo al mapa: la app real arranca en la puerta de inicio de sesión
+        // y una prueba automática no tiene cuenta. Aquí solo importa el mapa.
+        child: const MaterialApp(home: MapScreen()),
       ),
     );
     // Deja cargar las teselas y el snapshot

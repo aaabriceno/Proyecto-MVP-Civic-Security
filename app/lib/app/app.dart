@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/auth/presentation/auth_gate.dart';
 import '../features/map/presentation/map_screen.dart';
 
 class CivicApp extends StatelessWidget {
@@ -14,7 +15,13 @@ class CivicApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF1F4E79),
         useMaterial3: true,
       ),
-      home: const MapScreen(),
+      // La puerta decide qué ver según la sesión: bienvenida, login/registro o
+      // el mapa. Sin cuenta se puede ver el mapa, pero no reportar.
+      home: AuthGate(
+        signedInBuilder: (_) => const MapScreen(),
+        publicMapBuilder: (_, onSignIn) =>
+            MapScreen(readOnly: true, onSignIn: onSignIn),
+      ),
     );
   }
 }
