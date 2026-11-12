@@ -224,13 +224,39 @@ Sirve para no depender del cable o para que **varias personas** prueben contra t
 
 > ⚠️ **La red tiene que permitirlo.** Muchas redes públicas o de universidad aíslan a los dispositivos entre sí y la tablet no vería tu computadora. Si no conecta, pasa de seguro por eso.
 
-### 5.1 Averigua la IP de tu computadora
+### 5.1 Confirma que la tablet y la computadora están en la misma red
+
+Es el paso donde más se falla. La tablet solo puede llegar a tu computadora si **las dos están en la misma red**, y eso hay que comprobarlo, no suponerlo.
+
+**Primero, la IP de tu computadora:**
 
 ```bash
-hostname -I
+ip -4 route get 1.1.1.1 | grep -o 'src [0-9.]*'
 ```
 
-Toma la que empieza con `192.168.` o `10.` (por ejemplo `192.168.1.7`). La tablet y la computadora deben estar en **la misma red Wi-Fi**.
+Muestra la IP que usa tu computadora para salir a internet, por ejemplo `src 192.168.1.7`. Esa es la que va en la `API_URL`. (`hostname -I` también sirve, pero lista varias y entre ellas están las de Docker, que no son tu Wi-Fi.) Las redes privadas usan uno de estos rangos:
+
+| Rango | Ejemplo | Suele ser |
+|---|---|---|
+| `192.168.x.x` | `192.168.1.7` | Wi-Fi de casa |
+| `10.x.x.x` | `10.0.0.25` | Algunas casas y oficinas |
+| `172.16.x.x` a `172.31.x.x` | `172.20.10.6` | Hotspot de iPhone y redes de universidad |
+
+**Después, la red de la tablet** (con la tablet conectada por cable):
+
+```bash
+adb shell ip -4 addr show wlan0 | grep -o 'inet [0-9./]*'
+adb shell dumpsys wifi 2>/dev/null | grep -m1 -o 'SSID: "[^"]*"'
+```
+
+Compara las dos IP: en la mayoría de las redes, los **tres primeros números deben ser iguales**.
+
+| Computadora | Tablet | Resultado |
+|---|---|---|
+| `172.20.10.6` | `172.20.10.13` | Misma red. Sigue. |
+| `172.20.10.6` | `172.16.176.37` | **Redes distintas.** La tablet no puede ver a la computadora. En Ajustes → Wi-Fi, conecta una de las dos a la red de la otra. |
+
+> 📱 **Si usas el hotspot del celular:** funciona, pero ten en cuenta que (1) tu IP cambia cada vez que cambias de red y hay que volver a compilar la app (paso 5.4); (2) el mapa descarga sus mosaicos por esa conexión y gasta tus datos móviles; (3) algunas redes no dejan que los dispositivos se vean entre sí, y eso solo se descubre en el paso 5.3.
 
 ### 5.2 Levanta el servidor abierto a la red
 
@@ -241,11 +267,27 @@ CIVIC_LAN=1 mix phx.server
 
 `CIVIC_LAN=1` hace que escuche en todas las interfaces (`0.0.0.0`) y no solo en `127.0.0.1`. Sin esa variable, el servidor nunca es visible para otros dispositivos.
 
+En **otra** terminal, comprueba que quedó abierto a la red:
+
+```bash
+ss -ltn | grep :4000
+```
+
+Debe decir `0.0.0.0:4000`. Si dice `127.0.0.1:4000`, olvidaste `CIVIC_LAN=1`.
+
 ### 5.3 Comprueba que la tablet lo alcanza
 
 Abre **Chrome en la tablet** y entra a `http://192.168.1.7:4000/health` (con tu IP). Debe mostrar `{"status":"ok"}`.
 
-- Si no carga: revisa que estén en la misma red y que tu firewall deje pasar el puerto 4000. En Ubuntu con `ufw`: `sudo ufw allow 4000/tcp` (y `sudo ufw delete allow 4000/tcp` al terminar).
+Si prefieres no tocar la tablet, con ella conectada por cable puedes hacer la misma petición desde su propia red (cambia la IP por la tuya):
+
+```bash
+adb shell "printf 'GET /health HTTP/1.0\r\n\r\n' | toybox nc -w 5 192.168.1.7 4000"
+```
+
+Debe empezar con `HTTP/1.0 200 OK`. Si se queda esperando y termina sin respuesta, la tablet no llega a tu computadora.
+
+- Si no carga: revisa que estén en la misma red (paso 5.1) y que tu firewall deje pasar el puerto 4000. En Ubuntu con `ufw`: `sudo ufw allow 4000/tcp` (y `sudo ufw delete allow 4000/tcp` al terminar).
 
 ### 5.4 Corre la app apuntando a esa IP
 
@@ -258,7 +300,16 @@ flutter run -d HVA5KEYM --dart-define=API_URL=http://192.168.1.7:4000
 
 Si cambias de red, tu IP cambia y hay que volver a compilar con la nueva.
 
-> Esta forma se probó el 2026-11-11: la tablet cargó el mapa, los incidentes y el tiempo real ("En vivo") hablando con el servidor por Wi-Fi, sin puente USB.
+Cuando la app ya abrió en la tablet, **puedes desconectar el cable**: queda instalada y habla con el servidor por Wi-Fi. Solo pierdes la recarga en caliente.
+
+**Qué deberías ver.** La pantalla de bienvenida no consulta al servidor, así que verla **no prueba** que la conexión funciona. La conexión está bien cuando:
+
+- creas una cuenta y entras al mapa (apartado 6), o
+- el mapa muestra los pines y la etiqueta verde **"En vivo"** (apartado 4.7).
+
+Si dice "No se pudo conectar con el servidor", mira el apartado 10.
+
+> Esta forma se probó el 2026-11-11: la tablet cargó el mapa, los incidentes y el tiempo real ("En vivo") hablando con el servidor por Wi-Fi, sin puente USB. El 2026-11-12 se repitió con un hotspot de iPhone (computadora `172.20.10.6`, tablet `172.20.10.13`): la tablet alcanzó `/health` y la app se instaló apuntando a esa IP.
 
 ### 5.5 Que otras personas prueben la app (instalador APK)
 
@@ -379,7 +430,7 @@ El **CI** de GitHub corre esto mismo en cada PR (el trabajo `Backend (Elixir)`, 
 | La app dice **"No se pudo conectar con el servidor"** | Servidor apagado, puente USB perdido o dirección equivocada | Revisa que `curl http://127.0.0.1:4000/health` responda; repite `adb reverse tcp:4000 tcp:4000`; confirma que corriste `flutter run` con la `API_URL` correcta |
 | El puente funcionaba y dejó de funcionar | `adb reverse` se pierde al desconectar el cable o reiniciar la tablet | Vuelve a ejecutar `adb reverse tcp:4000 tcp:4000` |
 | `adb devices` sale vacío | Cable que solo carga, depuración USB apagada o modo de USB incorrecto | Cambia de cable o puerto; en la tablet elige "Transferencia de archivos" y activa la depuración USB |
-| `adb devices` dice `unauthorized` | No aceptaste el aviso de la tablet | Desconecta, reconecta y acepta "Permitir depuración" |
+| `adb devices` dice `unauthorized` | No aceptaste el aviso de la tablet | Mira la pantalla de la tablet y acepta "Permitir depuración" (con "Permitir siempre"). Si tiene PIN o patrón, **desbloquéala**: con la pantalla bloqueada el aviso no sale. Si aun así no aparece: desconecta y reconecta; y si sigue igual, en Opciones de desarrollador toca **"Revocar autorizaciones de depuración USB"** y vuelve a conectar el cable |
 | `adb devices` dice `offline` | Conexión de `adb` colgada | `adb kill-server` y vuelve a `adb devices` |
 | **Mapa gris**, sin calles | La tablet no tiene internet (los mosaicos vienen de OpenStreetMap) | Conecta la tablet a una red con internet |
 | **"Sin reportes en esta zona"** | Los datos de prueba tienen más de 24 h | Mira el [apartado 7](#7-datos-de-demostración-los-pines-del-mapa) |
@@ -393,7 +444,7 @@ El **CI** de GitHub corre esto mismo en cada PR (el trabajo `Backend (Elixir)`, 
 | Tras `flutter drive` la app **desapareció** de la tablet | `flutter drive` la desinstala al terminar | Vuelve a correr `flutter run` |
 | Tras recompilar, **cambió la dirección** del servidor y la app sigue con la vieja | La `API_URL` se fija al compilar | Vuelve a correr `flutter run` con la nueva `--dart-define` (no basta recargar en caliente) |
 | La app dice que la dirección **"debe empezar con http:// o https://"** o la rechaza | Falta el `http://` o se usó `https://` sin certificado | Usa `http://...` en desarrollo |
-| En el Camino B la tablet **no carga** `http://IP:4000/health` | Red con aislamiento de clientes, firewall o IP equivocada | Prueba con otra red, abre el puerto 4000 o vuelve a ejecutar `hostname -I` |
+| En el Camino B la tablet **no carga** `http://IP:4000/health` | **Tablet y computadora en redes distintas**, red con aislamiento de clientes, firewall, servidor sin `CIVIC_LAN=1` o IP equivocada | 1) Compara las dos IP como en el [apartado 5.1](#51-confirma-que-la-tablet-y-la-computadora-están-en-la-misma-red): si los tres primeros números no coinciden, no están en la misma red. 2) `ss -ltn \| grep :4000` debe decir `0.0.0.0:4000`. 3) Vuelve a averiguar tu IP: cambia al cambiar de red. 4) Abre el puerto 4000 (`ufw`). 5) Si todo lo anterior está bien, la red aísla a los dispositivos (pasa en redes de universidad y algunos hotspots): usa otra red o el Camino A |
 
 Si nada de esto resuelve el problema, mira los registros del servidor (la terminal de `mix phx.server`) y la salida de `flutter run`: casi siempre dicen qué falló.
 
