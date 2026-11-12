@@ -7,6 +7,8 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/geo/arequipa.dart';
 import '../../../core/location/location_service.dart';
+import '../../auth/domain/auth_models.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../../incident/domain/incident.dart';
 import '../../report/presentation/adjust_location_screen.dart';
 import '../../report/presentation/report_screen.dart';
@@ -27,10 +29,22 @@ const _extentInicialHoja = 0.25;
 const _esperaAntesDeCargar = Duration(milliseconds: 500);
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key, this.mapController});
+  const MapScreen({
+    super.key,
+    this.mapController,
+    this.readOnly = false,
+    this.onSignIn,
+  });
 
   /// Solo para tests: permite inspeccionar la cámara del mapa.
   final MapController? mapController;
+
+  /// Mapa para quien aún no tiene cuenta: se ve todo, pero no se puede
+  /// reportar. En vez de "Reportar" ofrece iniciar sesión.
+  final bool readOnly;
+
+  /// Qué hacer cuando, en modo [readOnly], la persona quiere iniciar sesión.
+  final VoidCallback? onSignIn;
 
   @override
   ConsumerState<MapScreen> createState() => _MapScreenState();
@@ -181,6 +195,11 @@ class _MapScreenState extends ConsumerState<MapScreen>
     final incidents = ref.watch(visibleIncidentsProvider);
     final filter = ref.watch(typeFilterProvider);
     final live = ref.watch(liveMapProvider);
+    final auth = ref.watch(authControllerProvider);
+    final hasAccount =
+        !widget.readOnly &&
+        (auth.status == AuthStatus.signedIn ||
+            auth.status == AuthStatus.offline);
 
     return Scaffold(
       body: Stack(
@@ -258,6 +277,13 @@ class _MapScreenState extends ConsumerState<MapScreen>
                       child: LiveStatusChip(status: live),
                     ),
                   ),
+                  if (auth.status == AuthStatus.offline && !widget.readOnly)
+                    const _Banner(
+                      key: Key('aviso-sesion-sin-confirmar'),
+                      message:
+                          'Sin conexión: no pudimos confirmar tu sesión. '
+                          'Lo reintentaremos solos.',
+                    ),
                   _locationBanner(location),
                   _dataBanner(data),
                 ],
@@ -293,6 +319,16 @@ class _MapScreenState extends ConsumerState<MapScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (hasAccount) ...[
+                      FloatingActionButton.small(
+                        key: const Key('boton-cuenta'),
+                        heroTag: null,
+                        tooltip: 'Mi cuenta',
+                        onPressed: () => _openAccount(auth.user),
+                        child: const Icon(Icons.person_outline),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     FloatingActionButton.small(
                       key: const Key('boton-mi-ubicacion'),
                       // Sin animación Hero: dos botones con la misma etiqueta
@@ -309,21 +345,76 @@ class _MapScreenState extends ConsumerState<MapScreen>
                       child: const Icon(Icons.my_location),
                     ),
                     const SizedBox(height: 12),
-                    FloatingActionButton.extended(
-                      key: const Key('boton-reportar'),
-                      heroTag: null,
-                      backgroundColor: const Color(0xFFDC2626),
-                      foregroundColor: Colors.white,
-                      onPressed: () => _startReport(userPosition),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Reportar'),
-                    ),
+                    if (widget.readOnly)
+                      if (widget.onSignIn != null)
+                        FloatingActionButton.extended(
+                          key: const Key('boton-iniciar-sesion-mapa'),
+                          heroTag: null,
+                          onPressed: widget.onSignIn,
+                          icon: const Icon(Icons.login),
+                          label: const Text('Iniciar sesión para reportar'),
+                        )
+                      else
+                        const SizedBox.shrink()
+                    else
+                      FloatingActionButton.extended(
+                        key: const Key('boton-reportar'),
+                        heroTag: null,
+                        backgroundColor: const Color(0xFFDC2626),
+                        foregroundColor: Colors.white,
+                        onPressed: () => _startReport(userPosition),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Reportar'),
+                      ),
                   ],
                 ),
               );
             },
           ),
         ],
+      ),
+    );
+  }
+
+  /// Hoja provisional con la cuenta y "Cerrar sesión". El diseño final es el
+  /// frame 10 (Perfil), que llegará con la barra de pestañas.
+  void _openAccount(AuthUser? user) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                user?.alias ?? 'Sesión guardada',
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 4),
+              Text(switch (user?.nivel) {
+                AuthLevel.verificado => 'Cuenta verificada',
+                AuthLevel.invitado => 'Cuenta sin verificar',
+                null => 'No pudimos confirmarla: sin conexión',
+              }),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const Key('boton-cerrar-sesion'),
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    ref.read(authControllerProvider.notifier).logout();
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Cerrar sesión'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
