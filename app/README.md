@@ -1,17 +1,22 @@
-# civic_security
+# Civic Security: app
 
-A new Flutter project.
+App móvil en **Flutter** (Android primero): mapa en vivo, reporte anónimo y cuentas.
 
-## Getting Started
+Para levantar el servidor y correr la app en una tablet o teléfono, sigue la
+**[guía para ejecutar en local](../docs/guia-ejecucion-local.md)**.
 
-This project is a starting point for a Flutter application.
+## Comandos más usados
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+flutter pub get                                                  # dependencias
+flutter run -d <id> --dart-define=API_URL=http://127.0.0.1:4000  # corre en el dispositivo
+flutter test                                                     # pruebas
+flutter analyze                                                  # análisis estático
+dart format lib test                                             # formato
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+`<id>` es el que muestra `flutter devices`. La dirección del servidor (`API_URL`)
+se fija al compilar; ver la guía para el cable USB y para el Wi-Fi.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+La medición de rendimiento del mapa en un dispositivo real está en
+[rendimiento-mapa.md](../docs/rendimiento-mapa.md).

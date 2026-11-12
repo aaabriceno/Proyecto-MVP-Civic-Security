@@ -27,10 +27,22 @@ En los grupos de WhatsApp de seguridad vecinal circula mucha información, pero 
 
 ## Estado
 
-**Fase de diseño.** La arquitectura está propuesta y pendiente de que el equipo confirme algunas decisiones. Todavía no hay código de la app ni del backend.
+**MVP en construcción.** Lo que ya funciona:
+
+- **Backend:** API de reportes y mapa (`/v1`), canal en tiempo real, cuentas anónimas (alias y contraseña con Argon2id) y sesiones con renovación segura, con 198 pruebas automáticas.
+- **App Android:** mapa en vivo con tu ubicación y su círculo de precisión, filtros, reporte anónimo, y las pantallas de bienvenida, inicio de sesión y registro, con 339 pruebas automáticas.
+- **CI:** cada cambio pasa pruebas, análisis estático, auditoría de dependencias y búsqueda de secretos antes de entrar a `main`.
+
+Pendiente: verificación por DNI, validación comunitaria, mapa de calor, alertas por zona y fotos con rostros difuminados.
+
+## Cómo ejecutarlo
+
+**[Guía para ejecutar en local](docs/guia-ejecucion-local.md)**: paso a paso para levantar la base de datos, el servidor y la app en una tablet o teléfono Android (por cable USB o por Wi-Fi).
 
 ## Documentación
 
+- [Guía para ejecutar en local](docs/guia-ejecucion-local.md): servidor, base de datos y app en la tablet, paso a paso.
+- [Rendimiento del mapa](docs/rendimiento-mapa.md): cómo se mide en una tablet real y qué resultados dio.
 - [Contexto del MVP](civic-security-contexto-mvp.md): producto, privacidad, reglas de negocio y mockups.
 - [Arquitectura del MVP](docs/arquitectura-mvp.md): componentes, modelo de datos, API, seguridad, disponibilidad y plan de entregas.
 - [Respuestas del equipo](respuestas_preguntas_armar_arq.txt): insumos usados para definir la arquitectura.
@@ -40,10 +52,11 @@ En los grupos de WhatsApp de seguridad vecinal circula mucha información, pero 
 
 ```
 .
-├── app/        # App Flutter (por crear)
-├── backend/    # API Elixir + Phoenix (por crear)
-├── infra/      # docker-compose, despliegue, respaldos (por crear)
-└── docs/       # Arquitectura y decisiones técnicas
+├── app/            # App Flutter (Android)
+├── backend/        # API Elixir + Phoenix
+├── infra/          # docker-compose de PostgreSQL + PostGIS
+├── docs/           # Guía de ejecución, arquitectura, seguridad y rendimiento
+└── Avances-MVP/    # Informes de avance
 ```
 
 ## Equipo
