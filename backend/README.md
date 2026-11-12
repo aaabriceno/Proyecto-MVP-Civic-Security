@@ -1,18 +1,20 @@
-# Civic
+# Civic Security: backend
 
-To start your Phoenix server:
+API en **Elixir + Phoenix** (REST `/v1` y canal en tiempo real) sobre **PostgreSQL + PostGIS**.
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+Para levantar la base de datos, el servidor y la app juntos, sigue la
+**[guía para ejecutar en local](../docs/guia-ejecucion-local.md)**.
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+## Comandos más usados
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+```bash
+mix setup          # solo la primera vez: dependencias, base de datos y datos de prueba
+mix phx.server     # levanta el servidor en http://127.0.0.1:4000
+mix test           # pruebas (crean y usan su propia base civic_test)
+mix precommit      # compila sin avisos, formatea y prueba; antes de cada commit
+```
 
-## Learn more
+La base de datos se levanta con `docker compose -f ../infra/docker-compose.yml up -d`.
 
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix
+Más sobre el diseño: [arquitectura](../docs/arquitectura-mvp.md) y
+[revisión de seguridad](../docs/seguridad-revision-1.md).
