@@ -176,6 +176,9 @@ class _MapScreenState extends ConsumerState<MapScreen>
     final userPosition = locationState is LocationFound
         ? locationState.position
         : null;
+    final userAccuracy = locationState is LocationFound
+        ? locationState.accuracyMeters
+        : null;
 
     final data = ref.watch(mapIncidentsProvider);
     final incidents = ref.watch(visibleIncidentsProvider);
@@ -206,6 +209,22 @@ class _MapScreenState extends ConsumerState<MapScreen>
                 userAgentPackageName: 'pe.civicsecurity.civic_security',
                 tileProvider: ref.watch(tileProviderProvider),
               ),
+              // Círculo de precisión: "estás en algún lugar de este círculo".
+              // Va debajo del punto, y se omite si el sistema no informó la precisión.
+              if (userPosition != null && userAccuracy != null)
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: userPosition,
+                      radius: userAccuracy,
+                      // Metros del terreno: el círculo crece al acercar el mapa
+                      useRadiusInMeter: true,
+                      color: Colors.blue.withValues(alpha: 0.12),
+                      borderColor: Colors.blue.withValues(alpha: 0.4),
+                      borderStrokeWidth: 1,
+                    ),
+                  ],
+                ),
               if (userPosition != null)
                 MarkerLayer(
                   markers: [

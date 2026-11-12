@@ -20,9 +20,21 @@ sealed class LocationState {
 }
 
 final class LocationFound extends LocationState {
-  const LocationFound(this.position);
+  const LocationFound(this.position, {this.accuracyMeters});
   final LatLng position;
+
+  /// Radio de error estimado, en metros: el usuario está dentro de ese círculo
+  /// alrededor de [position]. `null` si el sistema no lo informó. Un GPS bueno da
+  /// decenas de metros; la ubicación por Wi-Fi puede dar cientos.
+  final double? accuracyMeters;
 }
+
+/// Convierte la precisión que informa el sistema en un valor usable.
+///
+/// Android informa 0 cuando no sabe cuál es la precisión, y un valor negativo,
+/// NaN o infinito no describe un radio: en todos esos casos es mejor no mostrar
+/// nada que dibujar un círculo inventado.
+double? accuracyFrom(double raw) => raw.isFinite && raw > 0 ? raw : null;
 
 final class LocationUnavailable extends LocationState {
   const LocationUnavailable(this.reason);
@@ -35,8 +47,8 @@ abstract interface class LocationService {
   /// Pide permiso si hace falta y devuelve la primera posición.
   Future<LocationState> locate();
 
-  /// Posiciones siguientes cuando el usuario se mueve.
-  Stream<LatLng> watch();
+  /// Posiciones siguientes cuando el usuario se mueve o mejora la precisión.
+  Stream<LocationFound> watch();
 
   /// Abre los ajustes del sistema que permiten resolver [reason].
   Future<void> openSettingsFor(LocationFailure reason);
@@ -72,7 +84,7 @@ class GeolocatorLocationService implements LocationService {
           timeLimit: Duration(seconds: 15),
         ),
       );
-      return LocationFound(LatLng(position.latitude, position.longitude));
+      return _found(position);
     } on Exception {
       // Tiempo agotado o error del proveedor de ubicación
       return const LocationUnavailable(LocationFailure.unavailable);
@@ -80,13 +92,18 @@ class GeolocatorLocationService implements LocationService {
   }
 
   @override
-  Stream<LatLng> watch() => Geolocator.getPositionStream(
+  Stream<LocationFound> watch() => Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
       accuracy: LocationAccuracy.high,
       // Solo avisa si el usuario se movió al menos 20 m: ahorra batería
       distanceFilter: 20,
     ),
-  ).map((p) => LatLng(p.latitude, p.longitude));
+  ).map(_found);
+
+  LocationFound _found(Position p) => LocationFound(
+    LatLng(p.latitude, p.longitude),
+    accuracyMeters: accuracyFrom(p.accuracy),
+  );
 
   @override
   Future<void> openSettingsFor(LocationFailure reason) async {
@@ -114,7 +131,7 @@ final userLocationProvider = StreamProvider.autoDispose<LocationState>((
 
   // Si hay posición, seguimos al usuario aunque hoy esté fuera de Arequipa
   if (first is LocationFound) {
-    yield* service.watch().map((p) => _checkArea(LocationFound(p)));
+    yield* service.watch().map(_checkArea);
   }
 });
 

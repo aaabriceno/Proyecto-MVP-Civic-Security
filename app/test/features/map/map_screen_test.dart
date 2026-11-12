@@ -45,11 +45,11 @@ class _BlankTileProvider extends TileProvider {
 }
 
 class _FakeLocationService implements LocationService {
-  _FakeLocationService(this.result, {Stream<LatLng>? updates})
+  _FakeLocationService(this.result, {Stream<LocationFound>? updates})
     : updates = updates ?? const Stream.empty();
 
   final LocationState result;
-  final Stream<LatLng> updates;
+  final Stream<LocationFound> updates;
   int locateCalls = 0;
   int settingsCalls = 0;
 
@@ -60,7 +60,7 @@ class _FakeLocationService implements LocationService {
   }
 
   @override
-  Stream<LatLng> watch() => updates;
+  Stream<LocationFound> watch() => updates;
 
   @override
   Future<void> openSettingsFor(LocationFailure reason) async => settingsCalls++;
@@ -178,6 +178,64 @@ void main() {
     expect(find.byKey(const Key('aviso-ubicacion')), findsNothing);
   });
 
+  group('círculo de precisión', () {
+    List<CircleMarker> circulos(WidgetTester tester) =>
+        tester.widget<CircleLayer>(find.byType(CircleLayer)).circles;
+
+    testWidgets('dibuja un círculo con la precisión, en metros reales', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(
+          const LocationFound(_enArequipa, accuracyMeters: 350),
+        ),
+      );
+
+      final circulo = circulos(tester).single;
+      expect(circulo.point, _enArequipa);
+      expect(circulo.radius, 350);
+      // Metros del terreno, no píxeles: crece o se achica con el zoom
+      expect(circulo.useRadiusInMeter, isTrue);
+    });
+
+    testWidgets('sin precisión conocida no inventa un círculo', (tester) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+      );
+
+      expect(find.byType(CircleLayer), findsNothing);
+      // El punto del usuario sí sigue estando
+      expect(find.byKey(const Key('mi-ubicacion')), findsOneWidget);
+    });
+
+    testWidgets(
+      'el círculo sigue al usuario y se ajusta a la nueva precisión',
+      (tester) async {
+        final updates = StreamController<LocationFound>();
+        addTearDown(updates.close);
+        await _pumpMap(
+          tester,
+          _FakeLocationService(
+            const LocationFound(_enArequipa, accuracyMeters: 350),
+            updates: updates.stream,
+          ),
+        );
+
+        // El GPS por fin engancha: se mueve un poco y la precisión mejora
+        const nueva = LatLng(-16.4295, -71.5050);
+        updates.add(const LocationFound(nueva, accuracyMeters: 12));
+        await tester.pump();
+        await tester.pump();
+
+        final circulo = circulos(tester).single;
+        expect(circulo.radius, 12);
+        expect(circulo.point, nueva);
+      },
+    );
+  });
+
   testWidgets('sin permiso muestra Arequipa y un aviso con Reintentar', (
     tester,
   ) async {
@@ -229,7 +287,7 @@ void main() {
   testWidgets('seguir al usuario mueve el punto pero no la cámara', (
     tester,
   ) async {
-    final updates = StreamController<LatLng>();
+    final updates = StreamController<LocationFound>();
     addTearDown(updates.close);
     final controller = await _pumpMap(
       tester,
@@ -241,7 +299,7 @@ void main() {
     final antes = tester.getCenter(find.byKey(const Key('mi-ubicacion')));
 
     // ~55 m al norte: sigue dentro de la pantalla
-    updates.add(const LatLng(-16.4295, -71.5050));
+    updates.add(const LocationFound(LatLng(-16.4295, -71.5050)));
     await tester.pump();
     await tester.pump();
 
