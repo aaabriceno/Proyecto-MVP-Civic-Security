@@ -18,6 +18,7 @@ defmodule Civic.Accounts.SessionsTest do
   end
 
   defp tras_dias(dias), do: DateTime.add(@t0, dias, :day)
+  defp tras_segundos(segundos), do: DateTime.add(@t0, segundos, :second)
 
   # Lee las filas tal como quedaron en la base, sin pasar por ningún esquema
   defp filas(user) do
@@ -148,12 +149,13 @@ defmodule Civic.Accounts.SessionsTest do
       assert viejo.familia == nuevo.familia
     end
 
-    test "reusar un refresh ya usado falla" do
+    test "reusar un refresh ya usado falla (pasada la ventana de repetición)" do
       user = user!()
       {:ok, primero} = Sessions.issue(user, now: @t0)
       {:ok, _} = Sessions.refresh(primero.refresh_token, now: @t0)
 
-      assert {:error, :invalid_token} = Sessions.refresh(primero.refresh_token, now: @t0)
+      assert {:error, :invalid_token} =
+               Sessions.refresh(primero.refresh_token, now: tras_segundos(31))
     end
 
     test "al detectar el reuso se revoca toda la familia, también el token nuevo" do
@@ -161,10 +163,12 @@ defmodule Civic.Accounts.SessionsTest do
       {:ok, primero} = Sessions.issue(user, now: @t0)
       {:ok, segundo} = Sessions.refresh(primero.refresh_token, now: @t0)
 
-      # Alguien presenta el token viejo: había una copia en circulación
-      {:error, :invalid_token} = Sessions.refresh(primero.refresh_token, now: @t0)
+      # Alguien presenta el token viejo mucho después: había una copia en circulación
+      {:error, :invalid_token} = Sessions.refresh(primero.refresh_token, now: tras_segundos(31))
 
-      assert {:error, :invalid_token} = Sessions.refresh(segundo.refresh_token, now: @t0)
+      assert {:error, :invalid_token} =
+               Sessions.refresh(segundo.refresh_token, now: tras_segundos(31))
+
       assert Enum.all?(filas(user), &(&1.revocado_en == ~D[2026-11-08]))
     end
 
@@ -173,9 +177,9 @@ defmodule Civic.Accounts.SessionsTest do
       {:ok, tablet} = Sessions.issue(user, now: @t0)
       {:ok, celular} = Sessions.issue(user, now: @t0)
       {:ok, _} = Sessions.refresh(tablet.refresh_token, now: @t0)
-      {:error, :invalid_token} = Sessions.refresh(tablet.refresh_token, now: @t0)
+      {:error, :invalid_token} = Sessions.refresh(tablet.refresh_token, now: tras_segundos(31))
 
-      assert {:ok, _} = Sessions.refresh(celular.refresh_token, now: @t0)
+      assert {:ok, _} = Sessions.refresh(celular.refresh_token, now: tras_segundos(31))
     end
 
     test "un token desconocido o con forma rara falla siempre igual" do
@@ -210,6 +214,117 @@ defmodule Civic.Accounts.SessionsTest do
       assert {:error, :invalid_token} = Sessions.refresh(t4.refresh_token, now: tras_dias(31))
       # Todos los tokens de la familia heredan el vencimiento del inicio de sesión
       assert Enum.all?(filas(user), &(&1.expira_en == ~D[2026-12-08]))
+    end
+  end
+
+  describe "repetición segura del refresh (la respuesta se perdió en el camino)" do
+    test "repetir el mismo refresh dentro de la ventana devuelve el mismo token nuevo" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, segundo} = Sessions.refresh(primero.refresh_token, now: @t0)
+
+      # El teléfono no recibió la respuesta y reintenta con el mismo token
+      assert {:ok, repetido} = Sessions.refresh(primero.refresh_token, now: tras_segundos(10))
+
+      assert repetido.refresh_token == segundo.refresh_token
+      assert repetido.expires_in == 900
+    end
+
+    test "con el reloj real: el access token de la repetición sirve" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user)
+      {:ok, _} = Sessions.refresh(primero.refresh_token)
+
+      assert {:ok, repetido} = Sessions.refresh(primero.refresh_token)
+
+      assert {:ok, id} = Sessions.verify_access(repetido.access_token)
+      assert id == user.id
+    end
+
+    test "repetir no revoca la familia: el token nuevo sigue sirviendo" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, segundo} = Sessions.refresh(primero.refresh_token, now: @t0)
+      {:ok, _} = Sessions.refresh(primero.refresh_token, now: tras_segundos(10))
+
+      assert {:ok, _} = Sessions.refresh(segundo.refresh_token, now: tras_segundos(12))
+    end
+
+    test "repetir no crea filas nuevas ni gasta tokens" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, _} = Sessions.refresh(primero.refresh_token, now: @t0)
+      {:ok, _} = Sessions.refresh(primero.refresh_token, now: tras_segundos(5))
+      {:ok, _} = Sessions.refresh(primero.refresh_token, now: tras_segundos(10))
+
+      assert length(filas(user)) == 2
+    end
+
+    test "pasada la ventana, el token viejo vuelve a ser un reuso y revoca la familia" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, segundo} = Sessions.refresh(primero.refresh_token, now: @t0)
+
+      assert {:error, :invalid_token} =
+               Sessions.refresh(primero.refresh_token, now: tras_segundos(31))
+
+      assert {:error, :invalid_token} =
+               Sessions.refresh(segundo.refresh_token, now: tras_segundos(32))
+    end
+
+    test "la ventana cuenta desde la rotación, no desde la última repetición" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, _} = Sessions.refresh(primero.refresh_token, now: @t0)
+
+      assert {:ok, _} = Sessions.refresh(primero.refresh_token, now: tras_segundos(20))
+
+      assert {:error, :invalid_token} =
+               Sessions.refresh(primero.refresh_token, now: tras_segundos(35))
+    end
+
+    test "si el token nuevo ya se usó, repetir el viejo es un reuso real" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, segundo} = Sessions.refresh(primero.refresh_token, now: @t0)
+      {:ok, tercero} = Sessions.refresh(segundo.refresh_token, now: tras_segundos(5))
+
+      # Entregar `segundo` otra vez sería darle al teléfono un token ya gastado
+      assert {:error, :invalid_token} =
+               Sessions.refresh(primero.refresh_token, now: tras_segundos(10))
+
+      assert {:error, :invalid_token} =
+               Sessions.refresh(tercero.refresh_token, now: tras_segundos(11))
+    end
+
+    test "una sesión cerrada no resucita por una repetición" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, segundo} = Sessions.refresh(primero.refresh_token, now: @t0)
+      :ok = Sessions.revoke(segundo.refresh_token, now: tras_segundos(3))
+
+      assert {:error, :invalid_token} =
+               Sessions.refresh(primero.refresh_token, now: tras_segundos(5))
+    end
+
+    test "una sesión vencida no se revive por una repetición" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      # El último día de la sesión, a las 23:59:50
+      {:ok, _} = Sessions.refresh(primero.refresh_token, now: ~U[2026-12-08 23:59:50Z])
+
+      # 15 segundos después ya es el día siguiente: la sesión venció
+      assert {:error, :invalid_token} =
+               Sessions.refresh(primero.refresh_token, now: ~U[2026-12-09 00:00:05Z])
+    end
+
+    test "otro token con la misma forma pero desconocido no se repite" do
+      user = user!()
+      {:ok, primero} = Sessions.issue(user, now: @t0)
+      {:ok, _} = Sessions.refresh(primero.refresh_token, now: @t0)
+
+      assert {:error, :invalid_token} =
+               Sessions.refresh(String.duplicate("b", 43), now: tras_segundos(5))
     end
   end
 

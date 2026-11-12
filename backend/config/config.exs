@@ -56,10 +56,14 @@ config :civic, CivicWeb.RateLimit,
 # cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
 config :civic, Civic.HashGate, max_concurrent: 8
 
-# Cuántos registros/inicios de sesión se atienden a la vez (ver Civic.HashGate).
-# Pasado el tope se responde 503 al instante. Con ~50 ms por hash, 8 a la vez
-# cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
-config :civic, Civic.HashGate, max_concurrent: 8
+# Repetición segura del refresh (ver Civic.Accounts.RefreshReplay): durante
+# `ttl_seconds` un refresh token ya usado devuelve el mismo token nuevo en vez de
+# revocar la sesión, por si la respuesta se perdió. Solo vive en la RAM del
+# servidor. `sweep_every` es cada cuántos ms se limpia lo vencido.
+config :civic, Civic.Accounts.RefreshReplay,
+  ttl_seconds: 30,
+  max_entries: 10_000,
+  sweep_every: :timer.seconds(60)
 
 # Argon2id para las contraseñas (type 2 = argon2id). m_cost es el exponente de
 # KiB: 15 -> 2^15 KiB = 32 MiB. Con t=3 y p=1 supera el mínimo de OWASP

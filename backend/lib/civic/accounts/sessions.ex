@@ -8,7 +8,8 @@ defmodule Civic.Accounts.Sessions do
       SHA-256. Es de un solo uso: cada vez que se usa entrega uno nuevo y queda
       marcado como usado. Si alguien presenta uno ya usado, hay una copia en
       circulación y se revoca toda la **familia** (todos los tokens nacidos del
-      mismo inicio de sesión).
+      mismo inicio de sesión), salvo que sea un reintento de pocos segundos
+      (ver `refresh/2`).
 
   La sesión vence a los 30 días del inicio de sesión (tope absoluto), la uses o
   no: rotar el token no alarga el plazo, el token nuevo hereda el vencimiento.
@@ -25,7 +26,7 @@ defmodule Civic.Accounts.Sessions do
 
   import Ecto.Query
 
-  alias Civic.Accounts.{RefreshToken, User}
+  alias Civic.Accounts.{RefreshReplay, RefreshToken, User}
   alias Civic.Repo
 
   # Cambiar la sal (v1 -> v2) invalida todos los access tokens: sirve para rotar
@@ -72,6 +73,11 @@ defmodule Civic.Accounts.Sessions do
   Falla con `{:error, :invalid_token}` si no existe, venció o ya se había usado
   (en este último caso además se revoca la familia). El error es siempre el
   mismo para no decirle a quien prueba tokens por qué falló.
+
+  **Excepción: repetir.** Si el token se usó hace menos de la ventana de
+  `Civic.Accounts.RefreshReplay` (30 s) y el token nuevo que produjo sigue sin
+  usarse, se devuelve ese mismo token nuevo (con un access token fresco) en vez
+  de revocar. Cubre el caso en que la respuesta se perdió y el teléfono reintenta.
   """
   @spec refresh(term(), keyword()) :: {:ok, tokens()} | {:error, :invalid_token}
   def refresh(token, opts \\ [])
@@ -116,11 +122,19 @@ defmodule Civic.Accounts.Sessions do
 
   defp rotate(nil, _today, _now), do: {:error, :invalid_token}
 
-  # Ya usado o revocado: otra persona tiene una copia. Se cae toda la familia.
-  defp rotate(%RefreshToken{revocado_en: revocado} = row, today, _now)
+  # Ya usado o revocado. Si hace segundos que se cambió, lo más probable es que la
+  # respuesta se perdiera y sea un reintento honesto: se repite el mismo resultado.
+  # Si no, otra persona tiene una copia y se cae toda la familia.
+  defp rotate(%RefreshToken{revocado_en: revocado} = row, today, now)
        when not is_nil(revocado) do
-    revoke_family(row.familia, today)
-    {:error, :invalid_token}
+    case replay(row, today, now) do
+      {:ok, pair} ->
+        {:ok, pair}
+
+      :none ->
+        revoke_family(row.familia, today)
+        {:error, :invalid_token}
+    end
   end
 
   defp rotate(%RefreshToken{} = row, today, now) do
@@ -129,8 +143,40 @@ defmodule Civic.Accounts.Sessions do
     else
       row |> Ecto.Changeset.change(revocado_en: today) |> Repo.update!()
       # El token nuevo hereda el vencimiento: rotar no alarga la sesión
-      {:ok, new_pair(row.usuario_id, row.familia, now, row.expira_en)}
+      pair = new_pair(row.usuario_id, row.familia, now, row.expira_en)
+
+      # Se recuerda DENTRO de la transacción, mientras la fila sigue bloqueada: si
+      # se hiciera después, un reintento simultáneo podría entrar entre la
+      # confirmación y el recuerdo, no encontrar nada y cerrar la sesión.
+      RefreshReplay.remember(row.token_hash, pair.refresh_token, to_ms(now))
+      {:ok, pair}
     end
+  end
+
+  # El resultado de rotar `row` hace pocos segundos, si todavía se puede repetir.
+  # Cualquier duda cae hacia el lado estricto: `:none` revoca la familia.
+  defp replay(row, today, now) do
+    with false <- Date.compare(today, row.expira_en) == :gt,
+         {:ok, next} <- RefreshReplay.lookup(row.token_hash, to_ms(now)),
+         true <- unused?(next) do
+      {:ok,
+       %{
+         access_token: sign_access(row.usuario_id, now),
+         refresh_token: next,
+         expires_in: @access_ttl_seconds
+       }}
+    else
+      _ -> :none
+    end
+  end
+
+  # Entregar un token que ya se gastó (o que se cerró con la sesión) sería dejarle
+  # al teléfono uno muerto: en ese caso no es un reintento sino un reuso real.
+  defp unused?(refresh_token) do
+    Repo.exists?(
+      from t in RefreshToken,
+        where: t.token_hash == ^hash(refresh_token) and is_nil(t.revocado_en)
+    )
   end
 
   # Con la fila bloqueada (FOR UPDATE), dos refresh simultáneos con el mismo
@@ -160,12 +206,16 @@ defmodule Civic.Accounts.Sessions do
     })
 
     %{
-      access_token:
-        Phoenix.Token.sign(secret(), @access_salt, user_id, signed_at: DateTime.to_unix(now)),
+      access_token: sign_access(user_id, now),
       refresh_token: refresh,
       expires_in: @access_ttl_seconds
     }
   end
+
+  defp sign_access(user_id, now),
+    do: Phoenix.Token.sign(secret(), @access_salt, user_id, signed_at: DateTime.to_unix(now))
+
+  defp to_ms(now), do: DateTime.to_unix(now, :millisecond)
 
   # SHA-256 basta porque el token es aleatorio de 256 bits y no se puede adivinar
   # (a diferencia de una contraseña, que necesita un hash lento como Argon2id)

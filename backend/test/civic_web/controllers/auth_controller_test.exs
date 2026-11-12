@@ -212,9 +212,12 @@ defmodule CivicWeb.AuthControllerTest do
       refute nuevo == tokens.refresh_token
     end
 
-    test "401 al reusar un refresh viejo, y el nuevo también deja de servir", %{conn: conn} do
+    test "401 al reusar un refresh viejo fuera de la ventana, y el nuevo también deja de servir",
+         %{conn: conn} do
       {:ok, tokens} = Sessions.issue(create_user!())
-      {:ok, nuevo} = Sessions.refresh(tokens.refresh_token)
+      # La rotación ocurrió hace un minuto: ya pasó la ventana de repetición segura
+      hace_un_minuto = DateTime.add(DateTime.utc_now(), -60, :second)
+      {:ok, nuevo} = Sessions.refresh(tokens.refresh_token, now: hace_un_minuto)
 
       conn = json_post(conn, ~p"/v1/auth/refresh", %{"refresh_token" => tokens.refresh_token})
       assert %{"error" => %{"code" => "invalid_token"}} = json_response(conn, 401)
@@ -223,6 +226,18 @@ defmodule CivicWeb.AuthControllerTest do
         json_post(build_conn(), ~p"/v1/auth/refresh", %{"refresh_token" => nuevo.refresh_token})
 
       assert json_response(conn, 401)
+    end
+
+    test "200: reintentar el mismo refresh (la respuesta se perdió) devuelve el mismo token nuevo",
+         %{conn: conn} do
+      {:ok, tokens} = Sessions.issue(create_user!())
+      body = %{"refresh_token" => tokens.refresh_token}
+
+      primera = conn |> json_post(~p"/v1/auth/refresh", body) |> json_response(200)
+      segunda = build_conn() |> json_post(~p"/v1/auth/refresh", body) |> json_response(200)
+
+      assert segunda["data"]["refresh_token"] == primera["data"]["refresh_token"]
+      assert segunda["data"]["expires_in"] == 900
     end
 
     test "401 con basura, sin campo o con tipo raro", %{conn: conn} do
