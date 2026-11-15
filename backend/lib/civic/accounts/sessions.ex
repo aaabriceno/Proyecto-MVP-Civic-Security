@@ -118,6 +118,21 @@ defmodule Civic.Accounts.Sessions do
 
   def revoke(_token, _opts), do: :ok
 
+  @doc """
+  Cierra TODAS las sesiones de la cuenta, en todos los dispositivos. Se usa al
+  cambiar la contraseña: quien la tuviera robada pierde el acceso. Los access
+  tokens ya emitidos siguen valiendo hasta que vencen (15 min): son sin estado.
+  """
+  @spec revoke_all(User.t(), keyword()) :: :ok
+  def revoke_all(%User{id: user_id}, opts \\ []) do
+    Repo.update_all(
+      from(t in RefreshToken, where: t.usuario_id == ^user_id and is_nil(t.revocado_en)),
+      set: [revocado_en: DateTime.to_date(now(opts))]
+    )
+
+    :ok
+  end
+
   # --- rotación ---
 
   defp rotate(nil, _today, _now), do: {:error, :invalid_token}

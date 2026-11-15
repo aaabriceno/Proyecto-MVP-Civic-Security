@@ -31,6 +31,16 @@ defmodule Civic.Incidents.Quota do
     end
   end
 
+  @doc """
+  Cuánto lleva gastado la cuenta y cuánto le corresponde, sin gastar nada. Los
+  intentos pasados del máximo (que se rechazaron) no se cuentan.
+  """
+  @spec usage(User.t()) :: %{usados: non_neg_integer(), maximo: pos_integer()}
+  def usage(%User{id: id, nivel: nivel}) do
+    {max, ventana_ms} = limit(nivel)
+    %{usados: min(RateLimit.get({:report_quota, id}, ventana_ms), max), maximo: max}
+  end
+
   @doc "Límite `{máximo, ventana_ms}` del nivel de cuenta."
   @spec limit(atom()) :: {pos_integer(), pos_integer()}
   def limit(nivel) do

@@ -355,4 +355,151 @@ defmodule Civic.AccountsTest do
       assert {:ok, _} = Accounts.authenticate("Zorro-190", @password, now: @t0)
     end
   end
+
+  describe "change_password/4" do
+    @nueva "otra contraseña larga y distinta"
+
+    test "cambia la contraseña: la nueva sirve y la vieja ya no" do
+      user = register!()
+
+      assert {:ok, _} = Accounts.change_password(user, @password, @nueva)
+
+      assert {:ok, _} = Accounts.authenticate("Halcon-482", @nueva)
+      assert {:error, :invalid_credentials} = Accounts.authenticate("Halcon-482", @password)
+    end
+
+    test "la contraseña nueva se guarda como hash Argon2id y nunca en claro" do
+      user = register!()
+
+      {:ok, cambiada} = Accounts.change_password(user, @password, @nueva)
+
+      assert "$argon2id$" <> _ = cambiada.password_hash
+      refute cambiada.password_hash =~ @nueva
+      assert cambiada.password == nil
+      refute cambiada.password_hash == user.password_hash
+    end
+
+    test "con la contraseña actual incorrecta no cambia nada" do
+      user = register!()
+
+      assert {:error, :invalid_credentials} =
+               Accounts.change_password(user, "no es la actual!!", @nueva)
+
+      assert {:ok, _} = Accounts.authenticate("Halcon-482", @password)
+      assert {:error, :invalid_credentials} = Accounts.authenticate("Halcon-482", @nueva)
+    end
+
+    test "equivocarse de contraseña actual cuenta como intento fallido y puede bloquear" do
+      user = register!()
+
+      for _ <- 1..5 do
+        assert {:error, :invalid_credentials} =
+                 Accounts.change_password(user, "no es la actual!!", @nueva, now: @t0)
+      end
+
+      assert {:error, {:locked, segundos}} =
+               Accounts.change_password(user, @password, @nueva, now: @t0)
+
+      assert segundos in 1..60
+      # Ni siquiera la contraseña correcta cambia nada mientras dura el bloqueo
+      assert {:error, {:locked, _}} = Accounts.authenticate("Halcon-482", @password, now: @t0)
+    end
+
+    test "una contraseña nueva inválida se rechaza y no cuenta como intento fallido" do
+      user = register!()
+
+      for _ <- 1..6 do
+        assert {:error, %Ecto.Changeset{} = cs} =
+                 Accounts.change_password(user, @password, "corta")
+
+        assert %{password: [_ | _]} = errors_on(cs)
+      end
+
+      assert {:ok, _} = Accounts.authenticate("Halcon-482", @password)
+    end
+
+    test "la nueva debe ser distinta de la actual" do
+      user = register!()
+
+      assert {:error, cs} = Accounts.change_password(user, @password, @password)
+
+      assert %{password: ["debe ser distinta de la actual"]} = errors_on(cs)
+    end
+
+    test "la nueva no puede contener el alias" do
+      user = register!()
+
+      assert {:error, cs} = Accounts.change_password(user, @password, "mi Halcon-482 secreto")
+
+      assert %{password: [mensaje]} = errors_on(cs)
+      assert mensaje =~ "alias"
+    end
+
+    test "la nueva se normaliza igual que al registrarse (ñ compuesta o descompuesta)" do
+      user = register!()
+      descompuesta = "contrasen\u0303a larga de prueba 1"
+      compuesta = "contraseña larga de prueba 1"
+
+      assert {:ok, _} = Accounts.change_password(user, @password, descompuesta)
+
+      assert {:ok, _} = Accounts.authenticate("Halcon-482", compuesta)
+    end
+  end
+
+  describe "delete_account/3" do
+    test "borra la cuenta, su consentimiento y sus sesiones" do
+      user = register!()
+      {:ok, _} = Civic.Accounts.Sessions.issue(user)
+
+      assert {:ok, _} = Accounts.delete_account(user, @password)
+
+      assert Accounts.get_user(user.id) == nil
+      assert Repo.all(from c in Consent, where: c.usuario_id == ^user.id) == []
+
+      assert Repo.all(from t in Civic.Accounts.RefreshToken, where: t.usuario_id == ^user.id) ==
+               []
+    end
+
+    test "con la contraseña incorrecta no borra nada" do
+      user = register!()
+
+      assert {:error, :invalid_credentials} = Accounts.delete_account(user, "no es la mía!!")
+
+      assert Accounts.get_user(user.id)
+    end
+
+    test "una cuenta bloqueada no se puede borrar adivinando" do
+      user = register!()
+
+      for _ <- 1..5 do
+        {:error, :invalid_credentials} = Accounts.delete_account(user, "no es la mía!!", now: @t0)
+      end
+
+      assert {:error, {:locked, _}} = Accounts.delete_account(user, @password, now: @t0)
+      assert Accounts.get_user(user.id)
+    end
+
+    test "tras borrarla no se puede entrar y el alias queda libre" do
+      user = register!()
+      {:ok, _} = Accounts.delete_account(user, @password)
+
+      assert {:error, :invalid_credentials} = Accounts.authenticate("Halcon-482", @password)
+      assert {:ok, _} = Accounts.register(attrs())
+    end
+
+    test "los reportes que hizo se conservan, sin ningún vínculo con la cuenta" do
+      user = register!()
+
+      {:ok, :created, incidente} =
+        Civic.Incidents.report_incident(
+          user,
+          %{"tipo" => "robo", "lat" => -16.4, "lng" => -71.53},
+          Ecto.UUID.generate()
+        )
+
+      {:ok, _} = Accounts.delete_account(user, @password)
+
+      assert Repo.get(Civic.Incidents.Incident, incidente.id)
+    end
+  end
 end

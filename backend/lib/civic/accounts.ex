@@ -48,6 +48,40 @@ defmodule Civic.Accounts do
     end
   end
 
+  @doc """
+  Cambia la contraseña de `user`. Exige la actual con las mismas reglas que el
+  inicio de sesión: equivocarse cuenta como intento fallido y puede bloquear la
+  cuenta, así quien tenga un access token robado no puede adivinarla.
+
+  Devuelve `{:ok, user}`, `{:error, :invalid_credentials}`,
+  `{:error, {:locked, segundos}}` o `{:error, changeset}` si la nueva no cumple
+  las reglas (eso no cuenta como intento fallido). Quien llama debe cerrar las
+  demás sesiones (`Sessions.revoke_all/2`).
+  """
+  @spec change_password(User.t(), term(), term(), keyword()) ::
+          {:ok, User.t()}
+          | {:error, :invalid_credentials | {:locked, pos_integer()} | Ecto.Changeset.t()}
+  def change_password(%User{} = user, current, new, opts \\ []) do
+    with {:ok, user} <- authenticate(user.alias, current, opts) do
+      user |> User.password_changeset(%{"password" => new}) |> Repo.update()
+    end
+  end
+
+  @doc """
+  Borra la cuenta: su consentimiento y sus sesiones se van con ella. **Los
+  reportes que hizo se conservan**: no están enlazados a la cuenta (solo llevan un
+  código distinto en cada uno) y son información de seguridad pública.
+
+  Exige la contraseña, con las mismas reglas de bloqueo que el inicio de sesión.
+  """
+  @spec delete_account(User.t(), term(), keyword()) ::
+          {:ok, User.t()} | {:error, :invalid_credentials | {:locked, pos_integer()}}
+  def delete_account(%User{} = user, password, opts \\ []) do
+    with {:ok, user} <- authenticate(user.alias, password, opts) do
+      Repo.delete(user)
+    end
+  end
+
   @doc "La cuenta con ese id, o `nil` si no existe o el id no tiene forma de UUID."
   @spec get_user(term()) :: User.t() | nil
   def get_user(id) when is_binary(id) do

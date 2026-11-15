@@ -12,7 +12,16 @@ defmodule CivicWeb.AuthJSON do
 
   def tokens(%{tokens: tokens}), do: %{data: tokens}
 
-  def me(%{user: %User{} = user}), do: %{data: user_data(user)}
+  # El perfil de quien pregunta: además de lo básico, desde cuándo existe la cuenta
+  # (solo año y mes) y cuánto lleva gastado del cupo diario de reportes
+  def me(%{user: %User{} = user, cupo: cupo}) do
+    %{
+      data:
+        user
+        |> user_data()
+        |> Map.merge(%{desde: Calendar.strftime(user.inserted_at, "%Y-%m"), cupo: cupo})
+    }
+  end
 
   defp user_data(%User{} = user), do: %{id: user.id, alias: user.alias, nivel: user.nivel}
 end

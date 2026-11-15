@@ -80,4 +80,13 @@ defmodule CivicWeb.Router do
 
     get "/me", MeController, :show
   end
+
+  # Cambiar la contraseña y borrar la cuenta exigen la contraseña actual: gastan
+  # Argon2id (tope de hashes simultáneos) y cuentan como intentos de inicio de sesión
+  scope "/v1", CivicWeb do
+    pipe_through [:api, :limit_login, :hash_gate, :authenticate]
+
+    put "/me/password", MeController, :update_password
+    delete "/me", MeController, :delete
+  end
 end

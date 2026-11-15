@@ -354,4 +354,32 @@ defmodule Civic.Accounts.SessionsTest do
       assert {:ok, _} = Sessions.refresh(celular.refresh_token, now: @t0)
     end
   end
+
+  describe "revoke_all/2 (cerrar todas las sesiones de una cuenta)" do
+    test "ninguna sesión de la cuenta se puede renovar, de ningún dispositivo" do
+      user = user!()
+      {:ok, uno} = Sessions.issue(user, now: @t0)
+      {:ok, dos} = Sessions.issue(user, now: @t0)
+
+      assert :ok = Sessions.revoke_all(user, now: @t0)
+
+      assert {:error, :invalid_token} = Sessions.refresh(uno.refresh_token, now: @t0)
+      assert {:error, :invalid_token} = Sessions.refresh(dos.refresh_token, now: @t0)
+    end
+
+    test "no toca las sesiones de otras cuentas" do
+      user = user!()
+      otra = user!("Otra-Cuenta")
+      {:ok, _} = Sessions.issue(user, now: @t0)
+      {:ok, ajena} = Sessions.issue(otra, now: @t0)
+
+      assert :ok = Sessions.revoke_all(user, now: @t0)
+
+      assert {:ok, _} = Sessions.refresh(ajena.refresh_token, now: @t0)
+    end
+
+    test "una cuenta sin sesiones no es un error" do
+      assert :ok = Sessions.revoke_all(user!(), now: @t0)
+    end
+  end
 end

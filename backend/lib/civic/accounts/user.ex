@@ -58,6 +58,34 @@ defmodule Civic.Accounts.User do
     |> hash_password()
   end
 
+  @doc """
+  Cambia la contraseña. Solo acepta `password`: el alias, el nivel y los
+  contadores no se tocan desde aquí. Sigue las mismas reglas que el registro y
+  además debe ser distinta de la actual.
+  """
+  def password_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:password])
+    |> validate_required([:password], message: "es obligatorio")
+    |> update_change(:password, &Password.normalize/1)
+    |> validate_password()
+    |> validate_distinta_de_la_actual(user)
+    |> hash_password()
+  end
+
+  # Solo si lo demás es válido: no vale la pena un segundo hash para una
+  # contraseña que ya se rechazó
+  defp validate_distinta_de_la_actual(%Ecto.Changeset{valid?: true} = changeset, user) do
+    nueva = get_change(changeset, :password)
+
+    if is_binary(nueva) and is_binary(user.password_hash) and
+         Password.valid?(nueva, user.password_hash),
+       do: add_error(changeset, :password, "debe ser distinta de la actual"),
+       else: changeset
+  end
+
+  defp validate_distinta_de_la_actual(changeset, _user), do: changeset
+
   defp validate_alias(changeset) do
     changeset
     |> validate_length(:alias, min: 3, max: 20, message: "debe tener entre 3 y 20 caracteres")

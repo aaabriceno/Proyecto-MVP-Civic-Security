@@ -271,6 +271,43 @@ defmodule Civic.IncidentsTest do
     end
   end
 
+  describe "Quota.usage/1 (cuánto cupo queda)" do
+    alias Civic.Incidents.Quota
+
+    test "una cuenta nueva no ha gastado nada" do
+      assert Quota.usage(create_user!()) == %{usados: 0, maximo: 3}
+      assert Quota.usage(create_user!(:verificado)) == %{usados: 0, maximo: 10}
+    end
+
+    test "cuenta los reportes nuevos, no las repeticiones" do
+      user = create_user!()
+      k = key()
+
+      {:ok, :created, _} = Incidents.report_incident(user, @valid, k)
+      {:ok, :existing, _} = Incidents.report_incident(user, @valid, k)
+      {:ok, :created, _} = Incidents.report_incident(user, @valid, key())
+
+      assert Quota.usage(user) == %{usados: 2, maximo: 3}
+    end
+
+    test "consultarlo no gasta cupo" do
+      user = create_user!()
+
+      for _ <- 1..10, do: Quota.usage(user)
+
+      assert Quota.usage(user) == %{usados: 0, maximo: 3}
+      assert {:ok, :created, _} = Incidents.report_incident(user, @valid, key())
+    end
+
+    test "con el cupo agotado marca el máximo, no más" do
+      user = create_user!()
+      for _ <- 1..3, do: {:ok, :created, _} = Incidents.report_incident(user, @valid, key())
+      {:error, {:quota_exceeded, _}} = Incidents.report_incident(user, @valid, key())
+
+      assert Quota.usage(user) == %{usados: 3, maximo: 3}
+    end
+  end
+
   describe "list_recent/2" do
     @bbox {-71.54, -16.40, -71.53, -16.39}
 
