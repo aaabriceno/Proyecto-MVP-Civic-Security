@@ -21,6 +21,67 @@ Map<String, dynamic> _tokens({
 };
 
 void main() {
+  group('AuthUser: datos del perfil (desde y cupo)', () {
+    Map<String, dynamic> base() => {
+      'id': '89e95dd3-b844-4c68-8186-c778448e407a',
+      'alias': 'Halcon-482',
+      'nivel': 'invitado',
+    };
+
+    test('lee desde (año y mes) y el cupo del día', () {
+      final user = AuthUser.tryFromJson({
+        ...base(),
+        'desde': '2026-09',
+        'cupo': {'usados': 1, 'maximo': 3},
+      })!;
+
+      expect(user.desde, DateTime(2026, 9));
+      expect(user.cupo!.usados, 1);
+      expect(user.cupo!.maximo, 3);
+      expect(user.cupo!.restantes, 2);
+    });
+
+    test('sin esos datos (registro, login) la cuenta sigue siendo válida', () {
+      final user = AuthUser.tryFromJson(base())!;
+
+      expect(user.desde, isNull);
+      expect(user.cupo, isNull);
+    });
+
+    test('un desde o un cupo malformado se ignora, no invalida la cuenta', () {
+      for (final malo in <Map<String, dynamic>>[
+        {'desde': 'septiembre'},
+        {'desde': '2026-13'},
+        {'desde': 5},
+        {'cupo': 'mucho'},
+        {
+          'cupo': {'usados': 'x', 'maximo': 3},
+        },
+        {
+          'cupo': {'usados': -1, 'maximo': 3},
+        },
+        {
+          'cupo': {'usados': 1, 'maximo': 0},
+        },
+      ]) {
+        final user = AuthUser.tryFromJson({...base(), ...malo});
+
+        expect(user, isNotNull, reason: '$malo');
+        expect(
+          user!.desde == null || user.cupo == null,
+          isTrue,
+          reason: '$malo',
+        );
+      }
+    });
+
+    test('los restantes nunca son negativos', () {
+      const cupo = ReportQuota(usados: 5, maximo: 3);
+
+      expect(cupo.restantes, 0);
+    });
+  });
+
   group('AuthUser.tryFromJson', () {
     test('lee id, alias y nivel', () {
       final user = AuthUser.tryFromJson(_user());

@@ -6,6 +6,8 @@ import 'package:civic_security/core/location/location_service.dart';
 import 'package:civic_security/core/network/api_failure.dart';
 import 'package:civic_security/features/auth/domain/auth_models.dart';
 import 'package:civic_security/features/auth/presentation/auth_controller.dart';
+import 'package:civic_security/features/profile/data/account_service.dart';
+import 'package:civic_security/features/profile/presentation/profile_screen.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
 import 'package:civic_security/features/report/domain/new_incident.dart';
@@ -122,6 +124,13 @@ class _FakeAuth extends AuthController {
   }
 }
 
+const _cuentaDePrueba = AuthUser(
+  id: '89e95dd3-b844-4c68-8186-c778448e407a',
+  alias: 'Halcon-Misti-482',
+  nivel: AuthLevel.invitado,
+  cupo: ReportQuota(usados: 1, maximo: 3),
+);
+
 Future<MapController> _pumpMap(
   WidgetTester tester,
   _FakeLocationService service, {
@@ -147,6 +156,7 @@ Future<MapController> _pumpMap(
           stream ?? FakeIncidentStream(),
         ),
         tileProviderProvider.overrideWithValue(_BlankTileProvider()),
+        profileProvider.overrideWith((ref) async => _cuentaDePrueba),
         if (auth != null) authControllerProvider.overrideWith(() => auth),
       ],
       child: MaterialApp(
@@ -657,7 +667,7 @@ void main() {
     );
     final enArequipa = _FakeLocationService(const LocationFound(_enArequipa));
 
-    testWidgets('con sesión, el botón de cuenta abre la hoja con el alias', (
+    testWidgets('con sesión, el botón de cuenta abre el perfil', (
       tester,
     ) async {
       await _pumpMap(
@@ -669,22 +679,42 @@ void main() {
       await tester.tap(find.byKey(const Key('boton-cuenta')));
       await tester.pumpAndSettle();
 
+      expect(find.byType(ProfileScreen), findsOneWidget);
       expect(find.text('Halcon-Misti-482'), findsOneWidget);
       expect(find.text('Cuenta sin verificar'), findsOneWidget);
     });
 
-    testWidgets('"Cerrar sesión" cierra la sesión y la hoja', (tester) async {
-      final auth = _FakeAuth(const AuthState.signedIn(unaCuenta));
-      await _pumpMap(tester, enArequipa, auth: auth);
-
+    testWidgets('el perfil vuelve al mapa con "atrás"', (tester) async {
+      await _pumpMap(
+        tester,
+        enArequipa,
+        auth: _FakeAuth(const AuthState.signedIn(unaCuenta)),
+      );
       await tester.tap(find.byKey(const Key('boton-cuenta')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('boton-cerrar-sesion')));
+
+      await tester.tap(find.byKey(const Key('boton-volver-perfil')));
       await tester.pumpAndSettle();
 
-      expect(auth.logouts, 1);
-      expect(find.byKey(const Key('boton-cerrar-sesion')), findsNothing);
+      expect(find.byType(ProfileScreen), findsNothing);
+      expect(find.byKey(const Key('boton-reportar')), findsOneWidget);
     });
+
+    testWidgets(
+      '"Cerrar sesión" en el perfil cierra la sesión y deja el perfil',
+      (tester) async {
+        final auth = _FakeAuth(const AuthState.signedIn(unaCuenta));
+        await _pumpMap(tester, enArequipa, auth: auth);
+
+        await tester.tap(find.byKey(const Key('boton-cuenta')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('boton-cerrar-sesion')));
+        await tester.pumpAndSettle();
+
+        expect(auth.logouts, 1);
+        expect(find.byType(ProfileScreen), findsNothing);
+      },
+    );
 
     testWidgets(
       'sin confirmar la sesión (sin señal) lo avisa y deja usar el mapa',

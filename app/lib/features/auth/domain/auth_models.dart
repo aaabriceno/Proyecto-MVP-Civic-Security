@@ -19,12 +19,42 @@ enum AuthLevel {
   }
 }
 
-/// La cuenta, tal como la expone la API: solo id, alias y nivel.
+/// Cuántos reportes nuevos lleva la cuenta hoy y cuántos le corresponden.
+class ReportQuota {
+  const ReportQuota({required this.usados, required this.maximo});
+
+  /// `null` si no tiene la forma esperada.
+  static ReportQuota? tryFromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final usados = json['usados'];
+    final maximo = json['maximo'];
+    if (usados is! int || usados < 0) return null;
+    if (maximo is! int || maximo <= 0) return null;
+    return ReportQuota(usados: usados, maximo: maximo);
+  }
+
+  final int usados;
+  final int maximo;
+
+  /// Los que quedan hoy; nunca negativo.
+  int get restantes => (maximo - usados).clamp(0, maximo);
+}
+
+/// La cuenta, tal como la expone la API: id, alias y nivel. El perfil (`/me`)
+/// agrega desde cuándo existe y el cupo del día; en un registro o un inicio de
+/// sesión esos dos vienen vacíos.
 class AuthUser {
-  const AuthUser({required this.id, required this.alias, required this.nivel});
+  const AuthUser({
+    required this.id,
+    required this.alias,
+    required this.nivel,
+    this.desde,
+    this.cupo,
+  });
 
   /// Devuelve `null` si falta algún campo, tiene otro tipo o el nivel no se
-  /// conoce (un servidor más nuevo que la app). Nunca lanza.
+  /// conoce (un servidor más nuevo que la app). Nunca lanza. Un `desde` o un
+  /// `cupo` malformado se ignora: no invalida la cuenta.
   static AuthUser? tryFromJson(Map<String, dynamic> json) {
     final id = json['id'];
     final alias = json['alias'];
@@ -33,12 +63,32 @@ class AuthUser {
     if (alias is! String || alias.isEmpty) return null;
     final level = nivel is String ? AuthLevel.fromWire(nivel) : null;
     if (level == null) return null;
-    return AuthUser(id: id, alias: alias, nivel: level);
+    return AuthUser(
+      id: id,
+      alias: alias,
+      nivel: level,
+      desde: _parseMonth(json['desde']),
+      cupo: ReportQuota.tryFromJson(json['cupo']),
+    );
+  }
+
+  // "2026-09" -> septiembre de 2026
+  static DateTime? _parseMonth(Object? raw) {
+    if (raw is! String) return null;
+    final match = RegExp(r'^(\d{4})-(0[1-9]|1[0-2])$').firstMatch(raw);
+    if (match == null) return null;
+    return DateTime(int.parse(match[1]!), int.parse(match[2]!));
   }
 
   final String id;
   final String alias;
   final AuthLevel nivel;
+
+  /// El mes en que se creó la cuenta (solo año y mes), si se sabe.
+  final DateTime? desde;
+
+  /// Cuánto lleva del cupo diario de reportes, si se sabe.
+  final ReportQuota? cupo;
 }
 
 /// El par de tokens de una sesión.

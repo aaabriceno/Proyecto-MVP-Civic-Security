@@ -24,8 +24,25 @@ abstract interface class AuthRepository {
   /// Cierra la sesión en el servidor (revoca el refresh token).
   Future<void> logout(String refreshToken);
 
-  /// La cuenta de quien tiene este access token.
+  /// La cuenta de quien tiene este access token, con su perfil.
   Future<AuthUser> me(String accessToken);
+
+  /// Cambia la contraseña. Devuelve una sesión nueva: el servidor cierra todas
+  /// las demás, incluida esta, y el refresh token que se tenía ya no sirve.
+  /// Una contraseña actual incorrecta llega como un 422 con el campo
+  /// `current_password` (no como 401).
+  Future<AuthSession> changePassword({
+    required String accessToken,
+    required String current,
+    required String next,
+  });
+
+  /// Borra la cuenta. Una contraseña incorrecta llega como un 422 con el campo
+  /// `password`.
+  Future<void> deleteAccount({
+    required String accessToken,
+    required String password,
+  });
 }
 
 class HttpAuthRepository implements AuthRepository {
@@ -82,6 +99,35 @@ class HttpAuthRepository implements AuthRepository {
         : AuthUser.tryFromJson(_data(response.data)!);
     if (user == null) throw const ApiFailure.invalidResponse();
     return user;
+  });
+
+  @override
+  Future<AuthSession> changePassword({
+    required String accessToken,
+    required String current,
+    required String next,
+  }) => _guard(() async {
+    final response = await _dio.put<Object?>(
+      '/v1/me/password',
+      data: {'current_password': current, 'new_password': next},
+      options: Options(headers: {'authorization': 'Bearer $accessToken'}),
+    );
+    final data = _data(response.data);
+    final session = data == null ? null : AuthSession.tryFromJson(data);
+    if (session == null) throw const ApiFailure.invalidResponse();
+    return session;
+  });
+
+  @override
+  Future<void> deleteAccount({
+    required String accessToken,
+    required String password,
+  }) => _guard(() async {
+    await _dio.delete<Object?>(
+      '/v1/me',
+      data: {'password': password},
+      options: Options(headers: {'authorization': 'Bearer $accessToken'}),
+    );
   });
 
   Future<AuthSession> _session(String path, Map<String, Object> body) =>

@@ -272,4 +272,148 @@ void main() {
       },
     );
   });
+
+  group('me (perfil)', () {
+    test('trae también desde y el cupo del día', () async {
+      final adapter = FakeHttpAdapter(200, {
+        'data': {
+          'id': '89e95dd3-b844-4c68-8186-c778448e407a',
+          'alias': 'Halcon-482',
+          'nivel': 'verificado',
+          'desde': '2026-09',
+          'cupo': {'usados': 4, 'maximo': 10},
+        },
+      });
+
+      final user = await _repo(adapter).me('access-123');
+
+      expect(user.nivel, AuthLevel.verificado);
+      expect(user.desde, DateTime(2026, 9));
+      expect(user.cupo!.restantes, 6);
+    });
+  });
+
+  group('changePassword', () {
+    test(
+      'hace PUT /v1/me/password con la sesión y las dos contraseñas',
+      () async {
+        final adapter = FakeHttpAdapter(200, _sessionBody());
+
+        final session = await _repo(adapter).changePassword(
+          accessToken: 'access-123',
+          current: 'la actual muy larga',
+          next: 'la nueva muy larga',
+        );
+
+        expect(adapter.last!.method, 'PUT');
+        expect(adapter.last!.path, '/v1/me/password');
+        expect(adapter.last!.headers['authorization'], 'Bearer access-123');
+        expect(adapter.last!.data, {
+          'current_password': 'la actual muy larga',
+          'new_password': 'la nueva muy larga',
+        });
+        expect(session.tokens.refreshToken, 'refresh-456');
+      },
+    );
+
+    test(
+      'una contraseña actual incorrecta llega como error del campo',
+      () async {
+        final adapter = FakeHttpAdapter(
+          422,
+          _errorBody('validation_failed', {
+            'current_password': ['es incorrecta'],
+          }),
+        );
+
+        final failure = await _failureOf(
+          () => _repo(
+            adapter,
+          ).changePassword(accessToken: 'a', current: 'x', next: 'y'),
+        );
+
+        expect(failure.code, 'validation_failed');
+        expect(failure.fields['current_password'], ['es incorrecta']);
+      },
+    );
+
+    test('una cuenta bloqueada trae la espera', () async {
+      final adapter = FakeHttpAdapter(
+        429,
+        _errorBody('account_locked'),
+        headers: {
+          'retry-after': ['60'],
+        },
+      );
+
+      final failure = await _failureOf(
+        () => _repo(
+          adapter,
+        ).changePassword(accessToken: 'a', current: 'x', next: 'y'),
+      );
+
+      expect(failure.code, 'account_locked');
+      expect(failure.retryAfter, const Duration(seconds: 60));
+    });
+
+    test('una respuesta sin sesión -> invalid_response', () async {
+      final adapter = FakeHttpAdapter(200, {'data': 'nada'});
+
+      final failure = await _failureOf(
+        () => _repo(
+          adapter,
+        ).changePassword(accessToken: 'a', current: 'x', next: 'y'),
+      );
+
+      expect(failure.code, 'invalid_response');
+    });
+  });
+
+  group('deleteAccount', () {
+    test('hace DELETE /v1/me con la sesión y la contraseña', () async {
+      final adapter = FakeHttpAdapter(204, null);
+
+      await _repo(adapter).deleteAccount(
+        accessToken: 'access-123',
+        password: 'mi contraseña larga',
+      );
+
+      expect(adapter.last!.method, 'DELETE');
+      expect(adapter.last!.path, '/v1/me');
+      expect(adapter.last!.headers['authorization'], 'Bearer access-123');
+      expect(adapter.last!.data, {'password': 'mi contraseña larga'});
+    });
+
+    test('una contraseña incorrecta llega como error del campo', () async {
+      final adapter = FakeHttpAdapter(
+        422,
+        _errorBody('validation_failed', {
+          'password': ['es incorrecta'],
+        }),
+      );
+
+      final failure = await _failureOf(
+        () => _repo(adapter).deleteAccount(accessToken: 'a', password: 'x'),
+      );
+
+      expect(failure.fields['password'], ['es incorrecta']);
+    });
+
+    test('sin conexión -> network', () async {
+      final adapter = FakeHttpAdapter(
+        204,
+        null,
+        error: DioException(
+          requestOptions: RequestOptions(path: '/v1/me'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      final failure = await _failureOf(
+        () => _repo(adapter).deleteAccount(accessToken: 'a', password: 'x'),
+      );
+
+      expect(failure.code, 'network');
+    });
+  });
 }

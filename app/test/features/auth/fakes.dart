@@ -52,12 +52,17 @@ class FakeAuthRepository implements AuthRepository {
   Future<AuthTokens> Function(String refreshToken)? onRefresh;
   Future<void> Function(String refreshToken)? onLogout;
   Future<AuthUser> Function(String accessToken)? onMe;
+  Future<AuthSession> Function(String accessToken, String current, String next)?
+  onChangePassword;
+  Future<void> Function(String accessToken, String password)? onDeleteAccount;
 
   final registerCalls = <String>[];
   final loginCalls = <String>[];
   final refreshCalls = <String>[];
   final logoutCalls = <String>[];
   final meCalls = <String>[];
+  final changePasswordCalls = <({String current, String next})>[];
+  final deleteAccountCalls = <String>[];
 
   @override
   Future<AuthSession> register({
@@ -91,6 +96,29 @@ class FakeAuthRepository implements AuthRepository {
   Future<AuthUser> me(String accessToken) {
     meCalls.add(accessToken);
     return _handler(onMe, 'me')(accessToken);
+  }
+
+  @override
+  Future<AuthSession> changePassword({
+    required String accessToken,
+    required String current,
+    required String next,
+  }) {
+    changePasswordCalls.add((current: current, next: next));
+    return _handler(onChangePassword, 'changePassword')(
+      accessToken,
+      current,
+      next,
+    );
+  }
+
+  @override
+  Future<void> deleteAccount({
+    required String accessToken,
+    required String password,
+  }) {
+    deleteAccountCalls.add(password);
+    return _handler(onDeleteAccount, 'deleteAccount')(accessToken, password);
   }
 
   T _handler<T>(T? handler, String name) =>

@@ -7,9 +7,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/geo/arequipa.dart';
 import '../../../core/location/location_service.dart';
-import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../incident/domain/incident.dart';
+import '../../profile/presentation/profile_screen.dart';
 import '../../report/presentation/adjust_location_screen.dart';
 import '../../report/presentation/report_screen.dart';
 import 'incident_detail.dart';
@@ -343,7 +343,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                         key: const Key('boton-cuenta'),
                         heroTag: null,
                         tooltip: 'Mi cuenta',
-                        onPressed: () => _openAccount(auth.user),
+                        onPressed: _openProfile,
                         child: const Icon(Icons.person_outline),
                       ),
                       const SizedBox(height: 12),
@@ -395,47 +395,12 @@ class _MapScreenState extends ConsumerState<MapScreen>
     );
   }
 
-  /// Hoja provisional con la cuenta y "Cerrar sesión". El diseño final es el
-  /// frame 10 (Perfil), que llegará con la barra de pestañas.
-  void _openAccount(AuthUser? user) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                user?.alias ?? 'Sesión guardada',
-                style: Theme.of(sheetContext).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 4),
-              Text(switch (user?.nivel) {
-                AuthLevel.verificado => 'Cuenta verificada',
-                AuthLevel.invitado => 'Cuenta sin verificar',
-                null => 'No pudimos confirmarla: sin conexión',
-              }),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  key: const Key('boton-cerrar-sesion'),
-                  onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    ref.read(authControllerProvider.notifier).logout();
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Cerrar sesión'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  /// Frame 05 -> 10: el perfil (alias, cupo del día, cambiar contraseña, borrar
+  /// la cuenta y cerrar sesión).
+  void _openProfile() {
+    Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute(builder: (_) => const ProfileScreen()));
   }
 
   Widget _locationBanner(AsyncValue<LocationState> location) {
