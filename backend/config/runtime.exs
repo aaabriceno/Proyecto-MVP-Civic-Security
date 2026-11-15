@@ -22,6 +22,23 @@ end
 
 config :civic, CivicWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# Cupo diario de reportes por cuenta (ver Civic.Incidents.Quota). Los valores por
+# defecto están en config.exs (3 sin verificar, 10 verificada); estas variables
+# permiten subirlos en una demostración sin tocar el código.
+for {nivel, variable} <- [
+      sin_verificar: "CIVIC_CUPO_SIN_VERIFICAR",
+      verificado: "CIVIC_CUPO_VERIFICADO"
+    ],
+    valor = System.get_env(variable) do
+  case Integer.parse(valor) do
+    {maximo, ""} when maximo > 0 ->
+      config :civic, Civic.Incidents.Quota, [{nivel, {maximo, :timer.hours(24)}}]
+
+    _ ->
+      raise "#{variable} debe ser un entero positivo (recibido: #{inspect(valor)})"
+  end
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

@@ -1,8 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/api_client.dart';
 import '../../../core/network/api_failure.dart';
+import '../../../core/network/auth_interceptor.dart';
+import '../../auth/data/session_dio.dart';
 import '../../report/domain/new_incident.dart';
 import '../domain/incident.dart';
 
@@ -13,9 +14,11 @@ abstract interface class IncidentRepository {
   /// Lanza [ApiFailure] si algo falla.
   Future<List<Incident>> fetchSnapshot(Bbox bbox);
 
-  /// Crea un reporte anónimo. [idempotencyKey] evita duplicados si el envío
-  /// se reintenta: el mismo reporte con la misma clave no se guarda dos veces.
-  /// Lanza [ApiFailure] si algo falla.
+  /// Crea un reporte. Exige sesión: el servidor no guarda quién lo hizo, pero
+  /// necesita saber que es una cuenta (y cuánto le queda del cupo del día).
+  /// [idempotencyKey] evita duplicados si el envío se reintenta: el mismo
+  /// reporte con la misma clave no se guarda dos veces. Lanza [ApiFailure] si
+  /// algo falla (`unauthorized` sin sesión, `report_quota_exceeded` sin cupo).
   Future<Incident> create(NewIncident input, {required String idempotencyKey});
 }
 
@@ -48,7 +51,9 @@ class HttpIncidentRepository implements IncidentRepository {
       final response = await _dio.post<Object?>(
         '/v1/incidents',
         data: input.toJson(),
-        options: Options(headers: {'idempotency-key': idempotencyKey}),
+        options: conSesion(
+          Options(headers: {'idempotency-key': idempotencyKey}),
+        ),
       );
       final body = response.data;
       final data = body is Map ? body['data'] : null;
@@ -82,5 +87,5 @@ class HttpIncidentRepository implements IncidentRepository {
 }
 
 final incidentRepositoryProvider = Provider<IncidentRepository>(
-  (ref) => HttpIncidentRepository(ref.watch(dioProvider)),
+  (ref) => HttpIncidentRepository(ref.watch(sessionDioProvider)),
 );

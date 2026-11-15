@@ -26,6 +26,10 @@ class ApiFailure implements Exception {
     : this(code: 'unexpected', message: 'Ocurrió un error inesperado');
 
   factory ApiFailure.fromDio(DioException e) {
+    // Un interceptor ya lo tradujo (p. ej. "no hay sesión"): se respeta
+    final error = e.error;
+    if (error is ApiFailure) return error;
+
     final response = e.response;
     if (response == null) {
       // Dio envuelve el error de leer un cuerpo que no es JSON en un

@@ -11,12 +11,13 @@ defmodule CivicWeb.RateLimitTest do
     original = Application.fetch_env!(:civic, CivicWeb.RateLimit)
     header = Application.get_env(:civic, :client_ip_header)
 
+    # Ventana de una hora en todos: el contador es de ventana fija y, si el
+    # minuto cambiara a mitad de un test, se reiniciaría y la petición que debía
+    # recibir 429 recibiría 201 (se vio en 1 de cada ~120 corridas).
     Application.put_env(:civic, CivicWeb.RateLimit,
-      write: {3, 60_000},
-      read: {5, 60_000},
-      socket: {2, 60_000},
-      # Ventana de una hora: el contador es de ventana fija y, si el minuto
-      # cambiara a mitad de un test, se reiniciaría y el test fallaría sin motivo
+      write: {3, :timer.hours(1)},
+      read: {5, :timer.hours(1)},
+      socket: {2, :timer.hours(1)},
       register: {2, :timer.hours(1)},
       login: {2, :timer.hours(1)},
       refresh: {2, :timer.hours(1)}
@@ -42,6 +43,20 @@ defmodule CivicWeb.RateLimitTest do
     "198.#{rem(n, 250) + 1}.#{rem(div(n, 250), 250) + 1}.#{rem(div(n, 62_500), 250) + 1}"
   end
 
+  # Reportar exige sesión. Cada llamada usa una cuenta nueva: estas pruebas miden
+  # el límite por IP, y el cupo diario por cuenta (3 reportes) no debe mezclarse.
+  defp fresh_session do
+    {:ok, user} =
+      Civic.Accounts.register(%{
+        "alias" => "Ip-#{:erlang.unique_integer([:positive])}",
+        "password" => "una contraseña larga y segura",
+        "acepta_consentimiento" => true
+      })
+
+    {:ok, %{access_token: access}} = Civic.Accounts.Sessions.issue(user)
+    "Bearer " <> access
+  end
+
   defp post_incident(conn, ip, headers \\ []) do
     conn = %{conn | remote_ip: ip}
 
@@ -49,6 +64,7 @@ defmodule CivicWeb.RateLimitTest do
       Enum.reduce(headers, conn, fn {k, v}, acc -> put_req_header(acc, k, v) end)
 
     conn
+    |> put_req_header("authorization", fresh_session())
     |> put_req_header("content-type", "application/json")
     |> put_req_header("idempotency-key", Ecto.UUID.generate())
     |> post(~p"/v1/incidents", @valid)
@@ -62,7 +78,7 @@ defmodule CivicWeb.RateLimitTest do
     conn = post_incident(build_conn(), ip)
     assert %{"error" => %{"code" => "rate_limited"}} = json_response(conn, 429)
     assert [retry] = get_resp_header(conn, "retry-after")
-    assert String.to_integer(retry) in 1..60
+    assert String.to_integer(retry) in 1..3600
   end
 
   test "un reporte bloqueado por el límite no se guarda", %{conn: conn} do

@@ -429,7 +429,14 @@ docker exec civic_db psql -U postgres -d civic_dev -c \
   "update incidentes set inserted_at = (now() at time zone 'utc') - (random() * interval '22 hours')"
 ```
 
-Para **crear un reporte tú mismo**, inicia sesión y toca **Reportar** en el mapa: se abre el formulario (tipo, ubicación y descripción). El pin nuevo aparece al instante, también en otras tablets conectadas. Hoy el servidor todavía no exige sesión para reportar; eso viene en una próxima entrega.
+Para **crear un reporte tú mismo**, inicia sesión y toca **Reportar** en el mapa: se abre el formulario (tipo, ubicación y descripción). El pin nuevo aparece al instante, también en otras tablets conectadas. **Reportar exige sesión**: el servidor responde 401 si no hay una cuenta, y cada cuenta tiene un **cupo diario de reportes nuevos** (3 si no ha verificado su DNI, 10 si lo verificó). Al agotarlo responde 429 con "Llegaste al límite de reportes de hoy". El cupo vive solo en la memoria del servidor (se reinicia al apagarlo) y el contador se reinicia a las 00:00 UTC, es decir, a las 19:00 en Perú. En una demostración puedes subirlo sin tocar el código:
+
+```bash
+cd backend
+CIVIC_CUPO_SIN_VERIFICAR=50 mix phx.server
+```
+
+Reenviar el mismo reporte (mala señal) no gasta cupo. Del autor, el servidor guarda solo un código que cambia en cada reporte, nunca el id de la cuenta.
 
 ---
 
@@ -507,6 +514,7 @@ Si nada de esto resuelve el problema, mira los registros del servidor (la termin
 |---|---|---|
 | `API_URL` | `flutter run --dart-define=API_URL=...` | A qué servidor habla la app. Por omisión `http://10.0.2.2:4000`, la dirección de la computadora vista desde el emulador de Android |
 | `CIVIC_LAN` | `CIVIC_LAN=1 mix phx.server` | Abre el servidor a la red (Camino B) |
+| `CIVIC_CUPO_SIN_VERIFICAR`, `CIVIC_CUPO_VERIFICADO` | `mix phx.server` | Cuántos reportes nuevos por día puede hacer cada cuenta (por omisión 3 y 10). Útil para demostraciones |
 
 En desarrollo **no hace falta ningún archivo `.env`**: las claves, el acceso a la base (`postgres`/`postgres`) y el secreto del servidor están en `backend/config/dev.exs` y son **solo de desarrollo**. La base solo escucha en tu computadora, así que esas credenciales no son accesibles desde fuera.
 

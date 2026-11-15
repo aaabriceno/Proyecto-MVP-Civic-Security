@@ -6,7 +6,13 @@ defmodule CivicWeb.UserSocketTest do
 
   setup do
     original = Application.fetch_env!(:civic, CivicWeb.RateLimit)
-    Application.put_env(:civic, CivicWeb.RateLimit, Keyword.put(original, :socket, {2, 60_000}))
+
+    Application.put_env(
+      :civic,
+      CivicWeb.RateLimit,
+      Keyword.put(original, :socket, {2, :timer.hours(1)})
+    )
+
     on_exit(fn -> Application.put_env(:civic, CivicWeb.RateLimit, original) end)
     :ok
   end
