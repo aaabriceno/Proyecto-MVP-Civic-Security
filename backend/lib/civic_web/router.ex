@@ -60,8 +60,11 @@ defmodule CivicWeb.Router do
     post "/logout", AuthController, :logout
   end
 
+  # Reportar exige sesión: el límite por IP va primero para frenar inundaciones
+  # (incluso de peticiones sin sesión) y luego se identifica la cuenta, que es
+  # la que tiene su propio cupo diario (Civic.Incidents.Quota).
   scope "/v1", CivicWeb do
-    pipe_through [:api, :limit_write]
+    pipe_through [:api, :limit_write, :authenticate]
 
     post "/incidents", IncidentController, :create
   end

@@ -33,6 +33,20 @@ defmodule CivicWeb.FallbackController do
 
   def call(conn, {:error, :unauthorized}), do: CivicWeb.Plugs.Authenticate.deny(conn)
 
+  # Cupo diario de reportes agotado. `retry-after` en segundos, redondeado hacia
+  # arriba para que reintentar justo a tiempo no vuelva a recibir 429.
+  def call(conn, {:error, {:quota_exceeded, retry_ms}}) do
+    conn
+    |> put_resp_header("retry-after", Integer.to_string(max(div(retry_ms + 999, 1000), 1)))
+    |> put_status(:too_many_requests)
+    |> json(%{
+      error: %{
+        code: "report_quota_exceeded",
+        message: "Llegaste al límite de reportes de hoy. Intenta de nuevo más tarde."
+      }
+    })
+  end
+
   # Mismo mensaje para "alias que no existe" y "contraseña equivocada"
   def call(conn, {:error, :invalid_credentials}) do
     conn
