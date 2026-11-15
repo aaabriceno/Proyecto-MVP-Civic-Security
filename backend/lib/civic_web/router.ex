@@ -67,6 +67,8 @@ defmodule CivicWeb.Router do
     pipe_through [:api, :limit_write, :authenticate]
 
     post "/incidents", IncidentController, :create
+    # Hace un HMAC (barato), no Argon2: no necesita el tope de hashes simultáneos
+    post "/verification/dni", VerificationController, :dni
   end
 
   scope "/v1", CivicWeb do
