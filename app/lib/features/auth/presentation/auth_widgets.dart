@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/network/api_failure.dart';
 import 'auth_failure_message.dart';
@@ -66,6 +67,8 @@ class AuthTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.maxLength,
+    this.inputFormatters,
+    this.suggestions = true,
     this.onChanged,
     this.onSubmitted,
   });
@@ -84,6 +87,14 @@ class AuthTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final int? maxLength;
+
+  /// Filtros de lo que se puede escribir (p. ej. solo dígitos).
+  final List<TextInputFormatter>? inputFormatters;
+
+  /// `false` apaga el corrector y las sugerencias aunque el campo no esté
+  /// oculto (un número de documento no debe pasar por el diccionario del
+  /// teclado). Un campo oculto ya las apaga siempre.
+  final bool suggestions;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -110,8 +121,9 @@ class AuthTextField extends StatelessWidget {
           controller: controller,
           obscureText: obscure,
           // Una contraseña no debe pasar por el corrector ni las sugerencias
-          autocorrect: !obscure,
-          enableSuggestions: !obscure,
+          autocorrect: !obscure && suggestions,
+          enableSuggestions: !obscure && suggestions,
+          inputFormatters: inputFormatters,
           autofillHints: autofillHints,
           keyboardType: keyboardType,
           textInputAction: textInputAction,

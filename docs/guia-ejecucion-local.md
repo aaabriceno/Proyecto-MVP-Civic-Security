@@ -438,6 +438,23 @@ CIVIC_CUPO_SIN_VERIFICAR=50 mix phx.server
 
 Reenviar el mismo reporte (mala señal) no gasta cupo. Del autor, el servidor guarda solo un código que cambia en cada reporte, nunca el id de la cuenta.
 
+### Verificar la cuenta con el DNI
+
+En la app: **Perfil → Verifica tu DNI**. Se escribe el número de 8 dígitos y la cuenta pasa a "verificada" (con el cupo mayor).
+
+- **No se guarda el DNI.** El servidor calcula un HMAC-SHA256 con la clave secreta `CIVIC_KEY_VERIF_V1` y guarda solo esa huella de 32 bytes (`usuarios.verif_hash`). Sin la clave, de la huella no se puede volver al número ni probar candidatos. Phoenix además oculta el campo `dni` de los logs.
+- **Una persona, una cuenta.** La huella tiene un índice único: si otra cuenta ya verificó ese número, el servidor responde 409 `dni_taken` ("Este DNI ya tiene una cuenta"). Para enseñarlo en una demostración, verifica un número con una cuenta y prueba el mismo con otra.
+- **Intentos limitados.** Cada cuenta tiene 5 intentos por día (se reinicia a las 00:00 UTC, y también al reiniciar el servidor), porque responder "ese DNI ya tiene cuenta" revela quién usa la app. Al agotarlos responde 429 `dni_attempts_exceeded`. Un número mal escrito (que no son 8 dígitos) no gasta intentos.
+- **Límite honesto:** esto no prueba que quien escribe el número sea su titular. No se consulta a RENIEC (devolvería el nombre y rompería la minimización de datos). Lo que sí garantiza es que un mismo número no abra varias cuentas verificadas.
+- Al borrar la cuenta se borra su huella, y ese número queda libre para otra cuenta.
+
+Para ver en la base qué quedó guardado (solo la huella, nunca el número):
+
+```bash
+docker exec civic_db psql -U postgres -d civic_dev -c \
+  "select alias, nivel, left(encode(verif_hash, 'hex'), 16) || '…' as huella from usuarios;"
+```
+
 ---
 
 ## 8. Pruebas automáticas

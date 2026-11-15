@@ -5,8 +5,8 @@ import '../../auth/data/auth_repository.dart';
 import '../../auth/data/session_manager.dart';
 import '../../auth/domain/auth_models.dart';
 
-/// Lo que se puede hacer con la propia cuenta: ver el perfil, cambiar la
-/// contraseña y borrarla. Une el repositorio (que habla con el servidor) con la
+/// Lo que se puede hacer con la propia cuenta: ver el perfil, verificarla con
+/// el DNI, cambiar la contraseña y borrarla. Une el repositorio (que habla con el servidor) con la
 /// sesión (que sabe con qué token hablar y qué guardar).
 ///
 /// Todo fallo se lanza como [ApiFailure].
@@ -44,6 +44,11 @@ class AccountService {
   /// (`AuthController.logout`), que además deja la app en la pantalla de entrada.
   Future<void> deleteAccount({required String password}) async => _repository
       .deleteAccount(accessToken: await _token(), password: password);
+
+  /// Verifica la cuenta con el DNI. El número solo pasa por aquí hacia el
+  /// servidor: no se guarda en el teléfono.
+  Future<AuthUser> verifyDni(String dni) async =>
+      _repository.verifyDni(accessToken: await _token(), dni: dni);
 
   Future<String> _token() async {
     final token = await _session.validAccessToken();

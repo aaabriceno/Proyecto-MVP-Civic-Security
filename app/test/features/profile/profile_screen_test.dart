@@ -4,6 +4,7 @@ import 'package:civic_security/features/auth/domain/auth_models.dart';
 import 'package:civic_security/features/profile/presentation/change_password_screen.dart';
 import 'package:civic_security/features/profile/presentation/delete_account_screen.dart';
 import 'package:civic_security/features/profile/presentation/profile_screen.dart';
+import 'package:civic_security/features/profile/presentation/verify_dni_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -232,5 +233,91 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(find.text('Halcon-Misti-482'), findsOneWidget);
+  });
+
+  group('verificar con el DNI', () {
+    testWidgets('una cuenta sin verificar ofrece verificarse', (tester) async {
+      await pumpProfile(tester, const ProfileScreen());
+
+      final tarjeta = find.byKey(const Key('perfil-verificar'));
+      expect(tarjeta, findsOneWidget);
+      expect(
+        find.descendant(
+          of: tarjeta,
+          matching: find.textContaining('Verifica tu DNI'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('una cuenta verificada no ofrece nada', (tester) async {
+      await pumpProfile(tester, const ProfileScreen(), user: _verificada);
+
+      expect(find.byKey(const Key('perfil-verificar')), findsNothing);
+    });
+
+    testWidgets('mientras carga el perfil tampoco la ofrece', (tester) async {
+      final repo = FakeAuthRepository()
+        ..onMe = ((_) => Completer<AuthUser>().future)
+        ..onLogout = ((_) async {});
+      await pumpProfile(
+        tester,
+        const ProfileScreen(),
+        repo: repo,
+        settle: false,
+      );
+
+      expect(find.byKey(const Key('perfil-verificar')), findsNothing);
+    });
+
+    testWidgets('al tocarla abre la pantalla del DNI', (tester) async {
+      await pumpProfile(tester, const ProfileScreen());
+
+      await tester.tap(find.byKey(const Key('perfil-verificar')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VerifyDniScreen), findsOneWidget);
+    });
+
+    testWidgets('al verificarse, el perfil se actualiza solo', (tester) async {
+      var verificada = false;
+      final repo = FakeAuthRepository()
+        ..onMe = ((_) async => verificada ? _verificada : profileUser)
+        ..onVerifyDni = ((_, _) async {
+          verificada = true;
+          return _verificada;
+        });
+      await pumpProfile(tester, const ProfileScreen(), repo: repo);
+      await tester.tap(find.byKey(const Key('perfil-verificar')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('campo-dni')), '12345678');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('boton-verificar-dni')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VerifyDniScreen), findsNothing);
+      expect(find.text('Cuenta verificada'), findsOneWidget);
+      expect(find.text('Cuenta sin verificar'), findsNothing);
+      expect(find.byKey(const Key('perfil-verificar')), findsNothing);
+      expect(find.text('4 de 10'), findsOneWidget);
+    });
+
+    testWidgets('si se vuelve sin verificar, no vuelve a pedir el perfil', (
+      tester,
+    ) async {
+      final repo = FakeAuthRepository()
+        ..onMe = ((_) async => profileUser)
+        ..onLogout = ((_) async {});
+      await pumpProfile(tester, const ProfileScreen(), repo: repo);
+      await tester.tap(find.byKey(const Key('perfil-verificar')));
+      await tester.pumpAndSettle();
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VerifyDniScreen), findsNothing);
+      expect(repo.meCalls, hasLength(1));
+    });
   });
 }
