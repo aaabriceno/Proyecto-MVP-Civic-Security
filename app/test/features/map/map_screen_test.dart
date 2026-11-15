@@ -6,6 +6,9 @@ import 'package:civic_security/core/location/location_service.dart';
 import 'package:civic_security/core/network/api_failure.dart';
 import 'package:civic_security/features/auth/domain/auth_models.dart';
 import 'package:civic_security/features/auth/presentation/auth_controller.dart';
+import 'package:civic_security/features/heat/data/heat_repository.dart';
+import 'package:civic_security/features/heat/domain/heat_map.dart';
+import 'package:civic_security/features/heat/presentation/heat_map_screen.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
 import 'package:civic_security/features/report/domain/new_incident.dart';
@@ -122,6 +125,27 @@ class _FakeAuth extends AuthController {
   }
 }
 
+/// Mapa de calor de mentira: una celda en el centro de la zona visible.
+class _FakeHeatRepo implements HeatRepository {
+  @override
+  Future<HeatMap> fetch(Bbox bbox, HeatWindow window) async => HeatMap(
+    cellDeg: 0.005,
+    max: 3,
+    cells: [
+      HeatCell(
+        position: LatLng(
+          (bbox.minLat + bbox.maxLat) / 2,
+          (bbox.minLng + bbox.maxLng) / 2,
+        ),
+        count: 3,
+        tipos: const {IncidentType.robo: 3},
+        franjaDesde: 18,
+        franjaHasta: 21,
+      ),
+    ],
+  );
+}
+
 Future<MapController> _pumpMap(
   WidgetTester tester,
   _FakeLocationService service, {
@@ -147,6 +171,7 @@ Future<MapController> _pumpMap(
           stream ?? FakeIncidentStream(),
         ),
         tileProviderProvider.overrideWithValue(_BlankTileProvider()),
+        heatRepositoryProvider.overrideWithValue(_FakeHeatRepo()),
         if (auth != null) authControllerProvider.overrideWith(() => auth),
       ],
       child: MaterialApp(
@@ -646,6 +671,89 @@ void main() {
 
       binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       expect(stream.starts, 2);
+    });
+  });
+
+  group('mapa de calor', () {
+    testWidgets('el botón abre la pantalla del mapa de calor', (tester) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+      );
+
+      await tester.tap(find.byKey(const Key('boton-mapa-calor')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HeatMapScreen), findsOneWidget);
+    });
+
+    testWidgets('también está en el mapa de solo lectura (es público)', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+        readOnly: true,
+      );
+
+      expect(find.byKey(const Key('boton-mapa-calor')), findsOneWidget);
+    });
+
+    testWidgets('abre centrada donde estaba el mapa, con el mismo zoom', (
+      tester,
+    ) async {
+      final controller = await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+      );
+      final centro = controller.camera.center;
+      final zoom = controller.camera.zoom;
+
+      await tester.tap(find.byKey(const Key('boton-mapa-calor')));
+      await tester.pumpAndSettle();
+
+      final pantalla = tester.widget<HeatMapScreen>(find.byType(HeatMapScreen));
+      expect(pantalla.initialCenter.latitude, closeTo(centro.latitude, 1e-6));
+      expect(pantalla.initialCenter.longitude, closeTo(centro.longitude, 1e-6));
+      expect(pantalla.initialZoom, zoom);
+    });
+
+    testWidgets('"Mapa" vuelve sin mover el mapa', (tester) async {
+      final controller = await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+      );
+      final zoom = controller.camera.zoom;
+
+      await tester.tap(find.byKey(const Key('boton-mapa-calor')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('boton-volver-mapa')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HeatMapScreen), findsNothing);
+      expect(controller.camera.zoom, zoom);
+    });
+
+    testWidgets('"Ver incidentes" vuelve y acerca el mapa a esa zona', (
+      tester,
+    ) async {
+      final controller = await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+      );
+      expect(controller.camera.zoom, isNot(17));
+
+      await tester.tap(find.byKey(const Key('boton-mapa-calor')));
+      await tester.pumpAndSettle();
+      // La zona del falso está en el centro de la pantalla
+      await tester.tapAt(tester.getCenter(find.byType(HeatMapScreen)));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('ver-incidentes')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(HeatMapScreen), findsNothing);
+      expect(controller.camera.zoom, 17);
     });
   });
 

@@ -9,6 +9,7 @@ import '../../../core/geo/arequipa.dart';
 import '../../../core/location/location_service.dart';
 import '../../auth/domain/auth_models.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../heat/presentation/heat_map_screen.dart';
 import '../../incident/domain/incident.dart';
 import '../../report/presentation/adjust_location_screen.dart';
 import '../../report/presentation/report_screen.dart';
@@ -22,6 +23,9 @@ import 'map_providers.dart';
 import 'type_filter_bar.dart';
 
 const _zoomInicial = 16.0;
+
+// Al venir del mapa de calor con "Ver incidentes": lo bastante cerca para ver los pines
+const _zoomZona = 17.0;
 const _extentInicialHoja = 0.25;
 
 /// Tiempo que el mapa espera sin moverse antes de pedir los incidentes del
@@ -142,6 +146,21 @@ class _MapScreenState extends ConsumerState<MapScreen>
             east: b.east,
           ),
         );
+  }
+
+  /// Frame 05 -> 05b. Abre el mapa de calor donde está el mapa ahora; si el
+  /// usuario elige "Ver incidentes" de una zona, vuelve y se acerca a ella.
+  Future<void> _openHeatMap() async {
+    final camera = _controller.camera;
+    final zone = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute(
+        builder: (_) => HeatMapScreen(
+          initialCenter: camera.center,
+          initialZoom: camera.zoom,
+        ),
+      ),
+    );
+    if (zone != null && mounted) _controller.move(zone, _zoomZona);
   }
 
   /// Frame 05 -> 06: con ubicación abre el formulario; sin ella, primero pide
@@ -338,6 +357,15 @@ class _MapScreenState extends ConsumerState<MapScreen>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    // El mapa de calor es público, como el mapa: también en solo lectura
+                    FloatingActionButton.small(
+                      key: const Key('boton-mapa-calor'),
+                      heroTag: null,
+                      tooltip: 'Mapa de calor',
+                      onPressed: _openHeatMap,
+                      child: const Icon(Icons.local_fire_department_outlined),
+                    ),
+                    const SizedBox(height: 12),
                     if (hasAccount) ...[
                       FloatingActionButton.small(
                         key: const Key('boton-cuenta'),
