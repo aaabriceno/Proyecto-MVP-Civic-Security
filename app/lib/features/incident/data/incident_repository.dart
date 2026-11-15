@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -20,6 +23,16 @@ abstract interface class IncidentRepository {
   /// reporte con la misma clave no se guarda dos veces. Lanza [ApiFailure] si
   /// algo falla (`unauthorized` sin sesión, `report_quota_exceeded` sin cupo).
   Future<Incident> create(NewIncident input, {required String idempotencyKey});
+
+  /// Sube la foto del reporte [incidentId] (un JPEG ya sin metadatos, ver
+  /// `preparePhoto`). Solo puede quien lo reportó, y una sola vez. Devuelve el
+  /// reporte con `tieneFoto`. Lanza [ApiFailure] (`not_author`, `photo_exists`,
+  /// `photo_too_large`, `photo_has_metadata`...).
+  Future<Incident> uploadPhoto(String incidentId, Uint8List jpeg);
+
+  /// Los bytes de la foto de un reporte. Es pública, como el mapa: no manda la
+  /// sesión. Lanza [ApiFailure] (`not_found` si no tiene foto).
+  Future<Uint8List> fetchPhoto(String incidentId);
 }
 
 class HttpIncidentRepository implements IncidentRepository {
@@ -66,6 +79,60 @@ class HttpIncidentRepository implements IncidentRepository {
       throw ApiFailure.fromDio(e);
     } on FormatException {
       throw const ApiFailure.invalidResponse();
+    }
+  }
+
+  @override
+  Future<Incident> uploadPhoto(String incidentId, Uint8List jpeg) async {
+    try {
+      final response = await _dio.put<Object?>(
+        '/v1/incidents/$incidentId/photo',
+        // La foto cruda, no JSON ni multipart
+        data: jpeg,
+        options: conSesion(Options(contentType: 'image/jpeg')),
+      );
+      final body = response.data;
+      final data = body is Map ? body['data'] : null;
+      final incident = data is Map<String, dynamic>
+          ? Incident.tryFromJson(data)
+          : null;
+      if (incident == null) throw const ApiFailure.invalidResponse();
+      return incident;
+    } on DioException catch (e) {
+      throw ApiFailure.fromDio(e);
+    } on FormatException {
+      throw const ApiFailure.invalidResponse();
+    }
+  }
+
+  @override
+  Future<Uint8List> fetchPhoto(String incidentId) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '/v1/incidents/$incidentId/photo',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) {
+        throw const ApiFailure.invalidResponse();
+      }
+      return Uint8List.fromList(bytes);
+    } on DioException catch (e) {
+      throw ApiFailure.fromDio(_withDecodedError(e));
+    }
+  }
+
+  /// Con `responseType: bytes`, el JSON de un error también llega como bytes:
+  /// se decodifica para que `ApiFailure` lea su código.
+  DioException _withDecodedError(DioException e) {
+    final response = e.response;
+    final data = response?.data;
+    if (response == null || data is! List<int>) return e;
+    try {
+      final decoded = jsonDecode(utf8.decode(data));
+      return e.copyWith(response: response..data = decoded);
+    } on Object {
+      return e.copyWith(response: response..data = null);
     }
   }
 

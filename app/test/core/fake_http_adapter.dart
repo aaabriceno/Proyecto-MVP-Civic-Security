@@ -11,6 +11,8 @@ class FakeHttpAdapter implements HttpClientAdapter {
     this.body, {
     this.headers = const {},
     this.error,
+    this.bytes,
+    this.contentType,
   });
 
   final int status;
@@ -22,6 +24,11 @@ class FakeHttpAdapter implements HttpClientAdapter {
 
   /// Si se indica, la petición falla con este error (p. ej. sin conexión).
   final DioException? error;
+
+  /// Si se indica, la respuesta es este contenido binario (una foto) y [body] se
+  /// ignora. [contentType] es su tipo (por defecto `image/jpeg`).
+  final Uint8List? bytes;
+  final String? contentType;
 
   RequestOptions? last;
   int calls = 0;
@@ -35,6 +42,18 @@ class FakeHttpAdapter implements HttpClientAdapter {
     calls++;
     last = options;
     if (error != null) throw error!;
+
+    final binary = bytes;
+    if (binary != null) {
+      return ResponseBody.fromBytes(
+        binary,
+        status,
+        headers: {
+          Headers.contentTypeHeader: [contentType ?? 'image/jpeg'],
+          ...headers,
+        },
+      );
+    }
 
     final text = switch (body) {
       null => '',

@@ -27,15 +27,20 @@ abstract interface class IncidentStream {
   void dispose();
 }
 
-/// Implementación real: escucha `incidente_nuevo` en el canal de Phoenix.
+/// Implementación real: escucha `incidente_nuevo` e `incidente_actualizado` (al
+/// reporte le agregaron una foto) en el canal de Phoenix.
 class PhoenixIncidentStream implements IncidentStream {
   PhoenixIncidentStream(this._channel);
 
   final PhoenixChannel _channel;
 
   @override
-  Stream<Incident> get incidents =>
-      _channel.events.where((e) => e.event == 'incidente_nuevo').expand(_parse);
+  Stream<Incident> get incidents => _channel.events
+      .where(
+        (e) =>
+            e.event == 'incidente_nuevo' || e.event == 'incidente_actualizado',
+      )
+      .expand(_parse);
 
   /// Un mensaje que no se entiende se descarta: ni rompe el flujo ni cae la
   /// conexión (un servidor más nuevo que la app puede mandar tipos nuevos).

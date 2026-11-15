@@ -6,6 +6,7 @@ Map<String, dynamic> _json({
   String tipo = 'robo',
   String estado = 'sin_verificar',
   String? descripcion = 'Me robaron el celular',
+  Object? tieneFoto,
 }) => {
   'id': 'f92c3305-b156-4ceb-a7c1-9f101f3d0c7b',
   'tipo': tipo,
@@ -14,6 +15,7 @@ Map<String, dynamic> _json({
   'lng': -71.534,
   'estado': estado,
   'creado_en': '2026-11-03T21:50:33.997686Z',
+  'tiene_foto': ?tieneFoto,
 };
 
 void main() {
@@ -30,6 +32,46 @@ void main() {
       expect(i.descripcion, 'Me robaron el celular');
       expect(i.creadoEn, DateTime.utc(2026, 11, 3, 21, 50, 33, 997, 686));
       expect(i.creadoEn.isUtc, isTrue);
+    });
+
+    test('lee si el reporte tiene foto', () {
+      expect(Incident.tryFromJson(_json(tieneFoto: true))!.tieneFoto, isTrue);
+      expect(Incident.tryFromJson(_json(tieneFoto: false))!.tieneFoto, isFalse);
+    });
+
+    test('sin el campo (un servidor más viejo) no tiene foto', () {
+      expect(Incident.tryFromJson(_json())!.tieneFoto, isFalse);
+    });
+
+    test('un tiene_foto que no es booleano es un JSON malformado', () {
+      for (final malo in ['si', 1, <Object?>[]]) {
+        expect(
+          () => Incident.tryFromJson(_json(tieneFoto: malo)),
+          throwsFormatException,
+          reason: '$malo',
+        );
+      }
+    });
+
+    test('copyWith cambia solo la foto y conserva todo lo demás', () {
+      final i = Incident.tryFromJson(_json())!;
+
+      final con = i.copyWith(tieneFoto: true);
+
+      expect(con.tieneFoto, isTrue);
+      expect(i.tieneFoto, isFalse, reason: 'el original no cambia');
+      expect(
+        (
+          con.id,
+          con.tipo,
+          con.descripcion,
+          con.position,
+          con.estado,
+          con.creadoEn,
+        ),
+        (i.id, i.tipo, i.descripcion, i.position, i.estado, i.creadoEn),
+      );
+      expect(i.copyWith().tieneFoto, i.tieneFoto);
     });
 
     test('acepta descripción null', () {

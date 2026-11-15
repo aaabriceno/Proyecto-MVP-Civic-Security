@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 // Prueba de rendimiento del mapa en un dispositivo REAL, en modo profile.
 //
 //   flutter drive \
@@ -49,6 +51,13 @@ class _SinUbicacion implements LocationService {
 }
 
 class _Repositorio implements IncidentRepository {
+  @override
+  Future<Incident> uploadPhoto(String incidentId, Uint8List jpeg) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
+
   _Repositorio(this.incidentes);
 
   final List<Incident> incidentes;

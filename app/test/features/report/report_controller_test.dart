@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 
 import 'package:civic_security/core/network/api_failure.dart';
@@ -141,6 +142,13 @@ void main() {
 }
 
 class _Boom implements IncidentRepository {
+  @override
+  Future<Incident> uploadPhoto(String incidentId, Uint8List jpeg) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
+
   @override
   Future<List<Incident>> fetchSnapshot(Bbox bbox) async => const [];
 

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:civic_security/core/realtime/phoenix_channel.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
@@ -28,6 +30,13 @@ const _bbox = Bbox(
 );
 
 class _FakeRepo implements IncidentRepository {
+  @override
+  Future<Incident> uploadPhoto(String incidentId, Uint8List jpeg) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
+
   final calls = <Bbox>[];
   List<Incident> next = [];
 

@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/media/photo_picker.dart';
+import '../../../core/media/photo_processor.dart';
 import '../../../core/network/api_failure.dart';
 import '../../incident/domain/incident.dart';
 import '../../map/presentation/incident_style.dart';
@@ -41,6 +45,11 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
   IncidentType? _type;
   bool _typeMissing = false;
 
+  // La foto adjunta, ya preparada (sin ubicación ni datos del teléfono)
+  Uint8List? _photo;
+  bool _preparingPhoto = false;
+  String? _photoError;
+
   @override
   void dispose() {
     _description.dispose();
@@ -61,7 +70,63 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
             lat: _location.latitude,
             lng: _location.longitude,
           ),
+          photo: _photo,
         );
+  }
+
+  /// Pide la foto a la cámara o a la galería y la prepara. Cada error tiene su
+  /// mensaje y deja intentar de nuevo; ninguno rompe el formulario.
+  Future<void> _pickPhoto(PhotoSource source) async {
+    setState(() => _photoError = null);
+
+    Uint8List? picked;
+    try {
+      picked = await ref.read(photoPickerProvider).pick(source);
+    } on PhotoPickerException {
+      if (mounted) {
+        setState(
+          () => _photoError = source == PhotoSource.camera
+              ? 'No pudimos abrir la cámara. Revisa los permisos de la app.'
+              : 'No pudimos abrir la galería.',
+        );
+      }
+      return;
+    } on Object {
+      if (mounted) {
+        setState(
+          () => _photoError = 'No pudimos obtener la foto. Intenta de nuevo.',
+        );
+      }
+      return;
+    }
+    // `null`: la persona canceló
+    if (picked == null || !mounted) return;
+
+    setState(() => _preparingPhoto = true);
+    try {
+      final ready = await ref.read(photoPreparerProvider)(picked);
+      if (!mounted) return;
+      setState(() {
+        _photo = ready;
+        _preparingPhoto = false;
+      });
+    } on UnreadablePhotoException {
+      _photoFailed(
+        'Esa foto no se puede usar (formato no compatible o dañada). Elige otra.',
+      );
+    } on PhotoTooLargeException {
+      _photoFailed('La foto es demasiado grande. Elige otra.');
+    } on Object {
+      _photoFailed('No pudimos preparar la foto. Intenta con otra.');
+    }
+  }
+
+  void _photoFailed(String message) {
+    if (!mounted) return;
+    setState(() {
+      _preparingPhoto = false;
+      _photoError = message;
+    });
   }
 
   Future<void> _adjustLocation() async {
@@ -186,7 +251,20 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
                 ),
               ),
             ),
-            // La evidencia (foto) llega en una iteración posterior
+            const SizedBox(height: 20),
+            _sectionTitle('Foto (opcional)'),
+            _PhotoSection(
+              photo: _photo,
+              preparing: _preparingPhoto,
+              error: _photoError,
+              // Con el reporte enviándose no se cambia la foto
+              enabled: !state.sending,
+              onPick: _pickPhoto,
+              onRemove: () => setState(() {
+                _photo = null;
+                _photoError = null;
+              }),
+            ),
             if (failure != null && fields.isEmpty) _FailureBanner(failure),
             const SizedBox(height: 16),
             FilledButton(
@@ -220,6 +298,150 @@ class _ReportScreenState extends ConsumerState<ReportScreen> {
       style: const TextStyle(fontSize: 13, color: Colors.black54),
     ),
   );
+}
+
+/// La foto opcional del reporte: elegirla, ver cómo quedó y quitarla.
+class _PhotoSection extends StatelessWidget {
+  const _PhotoSection({
+    required this.photo,
+    required this.preparing,
+    required this.error,
+    required this.enabled,
+    required this.onPick,
+    required this.onRemove,
+  });
+
+  final Uint8List? photo;
+  final bool preparing;
+  final String? error;
+  final bool enabled;
+  final ValueChanged<PhotoSource> onPick;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final photo = this.photo;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (preparing)
+          Container(
+            key: const Key('foto-preparando'),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                SizedBox(width: 12),
+                Text('Preparando la foto…'),
+              ],
+            ),
+          )
+        else if (photo != null)
+          _PhotoPreview(bytes: photo, enabled: enabled, onRemove: onRemove)
+        else
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('foto-camara'),
+                  onPressed: enabled ? () => onPick(PhotoSource.camera) : null,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: const Text('Cámara'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('foto-galeria'),
+                  onPressed: enabled ? () => onPick(PhotoSource.gallery) : null,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('Galería'),
+                ),
+              ),
+            ],
+          ),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              error!,
+              key: const Key('error-foto'),
+              style: const TextStyle(color: _red, fontSize: 12.5),
+            ),
+          ),
+        const Padding(
+          key: Key('aviso-foto'),
+          padding: EdgeInsets.only(top: 8),
+          child: Text(
+            'Evita fotos con rostros o placas: se verán en el mapa.',
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PhotoPreview extends StatelessWidget {
+  const _PhotoPreview({
+    required this.bytes,
+    required this.enabled,
+    required this.onRemove,
+  });
+
+  final Uint8List bytes;
+  final bool enabled;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              bytes,
+              key: const Key('foto-previa'),
+              width: 72,
+              height: 72,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const SizedBox(
+                width: 72,
+                height: 72,
+                child: Icon(Icons.broken_image_outlined),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Se envía sin ubicación ni datos del teléfono.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+          TextButton(
+            key: const Key('foto-quitar'),
+            onPressed: enabled ? onRemove : null,
+            child: const Text('Quitar'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AnonymousBadge extends StatelessWidget {

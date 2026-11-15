@@ -66,6 +66,28 @@ void main() {
     expect(mapTopic, 'mapa:arequipa');
   });
 
+  _streamTest(
+    'convierte incidente_actualizado (le pusieron foto) en un Incident',
+    (tester, net, stream) async {
+      final received = <Incident>[];
+      stream.incidents.listen(received.add);
+      final conn = await _start(tester, net, stream);
+
+      conn.serverSends([
+        null,
+        null,
+        mapTopic,
+        'incidente_actualizado',
+        {..._payload(), 'tiene_foto': true},
+      ]);
+      await tester.pump();
+
+      expect(received, hasLength(1));
+      expect(received.single.id, 'a1');
+      expect(received.single.tieneFoto, isTrue);
+    },
+  );
+
   _streamTest('convierte incidente_nuevo en un Incident', (
     tester,
     net,

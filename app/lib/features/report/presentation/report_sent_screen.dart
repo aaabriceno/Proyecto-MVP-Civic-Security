@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/phone/dialer.dart';
 import '../../incident/domain/incident.dart';
+import 'photo_messages.dart';
+import 'report_controller.dart';
 
 const _blue = Color(0xFF0A84FF);
 const _red = Color(0xFFDC2626);
@@ -16,6 +18,9 @@ class ReportSentScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final report = ref.watch(reportControllerProvider);
+    final uploading = report.photo == PhotoStatus.uploading;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -60,6 +65,14 @@ class ReportSentScreen extends ConsumerWidget {
                   style: TextStyle(color: Color(0xFF1E3A8A)),
                 ),
               ),
+              if (report.photo != PhotoStatus.none) ...[
+                const SizedBox(height: 16),
+                _PhotoStatusRow(
+                  report: report,
+                  onRetry: () =>
+                      ref.read(reportControllerProvider.notifier).retryPhoto(),
+                ),
+              ],
               const Spacer(flex: 2),
               OutlinedButton(
                 key: const Key('llamar-105'),
@@ -78,12 +91,84 @@ class ReportSentScreen extends ConsumerWidget {
                   backgroundColor: _blue,
                   minimumSize: const Size.fromHeight(52),
                 ),
-                onPressed: () => Navigator.of(context).pop(true),
+                // Si se sale mientras sube, un fallo pasaría sin que se vea
+                onPressed: uploading
+                    ? null
+                    : () => Navigator.of(context).pop(true),
                 child: const Text('Ver en el mapa'),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Cómo va la foto del reporte: subiendo, adjunta, o por qué falló.
+class _PhotoStatusRow extends StatelessWidget {
+  const _PhotoStatusRow({required this.report, required this.onRetry});
+
+  final ReportState report;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final failure = report.photoFailure;
+
+    return Container(
+      key: const Key('estado-foto'),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: report.photo == PhotoStatus.failed
+            ? const Color(0xFFFEF2F2)
+            : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Semantics(
+        liveRegion: true,
+        child: switch (report.photo) {
+          PhotoStatus.uploading => const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              SizedBox(width: 10),
+              Text('Subiendo la foto…'),
+            ],
+          ),
+          PhotoStatus.uploaded => const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle, size: 18, color: _green),
+              SizedBox(width: 8),
+              Text('Foto adjunta'),
+            ],
+          ),
+          PhotoStatus.failed => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  failure == null
+                      ? 'No pudimos subir la foto.'
+                      : photoFailureMessage(failure),
+                  style: const TextStyle(color: _red),
+                ),
+              ),
+              if (failure == null || canRetryPhoto(failure))
+                TextButton(
+                  key: const Key('reintentar-foto'),
+                  onPressed: onRetry,
+                  child: const Text('Reintentar'),
+                ),
+            ],
+          ),
+          PhotoStatus.none => const SizedBox.shrink(),
+        },
       ),
     );
   }

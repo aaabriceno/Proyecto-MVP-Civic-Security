@@ -50,6 +50,7 @@ class Incident {
     required this.position,
     required this.estado,
     required this.creadoEn,
+    this.tieneFoto = false,
   });
 
   /// Convierte el JSON de la API. Devuelve `null` si el tipo o el estado no se
@@ -73,6 +74,8 @@ class Incident {
         ),
         estado: estado,
         creadoEn: DateTime.parse(json['creado_en'] as String).toUtc(),
+        // Un servidor más viejo no manda el campo: sin foto
+        tieneFoto: json['tiene_foto'] as bool? ?? false,
       );
     } on TypeError catch (e) {
       throw FormatException('Incidente malformado: $e');
@@ -87,6 +90,20 @@ class Incident {
 
   /// Siempre en UTC; se convierte a hora local solo al mostrarla.
   final DateTime creadoEn;
+
+  /// ¿Quien lo reportó adjuntó una foto? Se pide aparte (`fetchPhoto`).
+  final bool tieneFoto;
+
+  /// Una copia con la foto indicada (el resto no cambia).
+  Incident copyWith({bool? tieneFoto}) => Incident(
+    id: id,
+    tipo: tipo,
+    descripcion: descripcion,
+    position: position,
+    estado: estado,
+    creadoEn: creadoEn,
+    tieneFoto: tieneFoto ?? this.tieneFoto,
+  );
 }
 
 /// Rectángulo geográfico que se pide a `GET /v1/map/snapshot`.

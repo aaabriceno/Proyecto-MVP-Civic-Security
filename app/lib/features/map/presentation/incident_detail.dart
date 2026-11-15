@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../incident/domain/incident.dart';
+import 'incident_photo.dart';
 import 'incident_style.dart';
 import 'status_chip.dart';
 
@@ -38,7 +39,8 @@ class _IncidentDetail extends StatelessWidget {
           );
     final when = relativeTime(incident.creadoEn, DateTime.now().toUtc());
 
-    return Padding(
+    // Con foto el detalle puede no caber en una pantalla chica: se desplaza
+    return SingleChildScrollView(
       key: const Key('detalle-incidente'),
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
       child: Column(
@@ -68,6 +70,10 @@ class _IncidentDetail extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(incident.descripcion ?? 'Sin descripción'),
+          if (incident.tieneFoto) ...[
+            const SizedBox(height: 14),
+            IncidentPhoto(incidentId: incident.id),
+          ],
         ],
       ),
     );

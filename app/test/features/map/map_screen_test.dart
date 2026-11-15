@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 import 'dart:convert';
 
@@ -75,6 +76,13 @@ class _FakeLocationService implements LocationService {
 
 /// Repositorio falso: devuelve [incidents], o lanza [failure] si se indica.
 class _FakeRepo implements IncidentRepository {
+  @override
+  Future<Incident> uploadPhoto(String incidentId, Uint8List jpeg) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
+
   _FakeRepo({this.incidents = const [], this.failure});
 
   List<Incident> incidents;

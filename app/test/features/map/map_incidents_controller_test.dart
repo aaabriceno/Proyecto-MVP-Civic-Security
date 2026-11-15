@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:async';
 
 import 'package:civic_security/core/network/api_failure.dart';
@@ -27,6 +28,13 @@ const _bbox = Bbox(
 
 /// Repositorio falso: cada llamada devuelve lo que el test decida.
 class _FakeRepo implements IncidentRepository {
+  @override
+  Future<Incident> uploadPhoto(String incidentId, Uint8List jpeg) =>
+      throw UnimplementedError();
+
+  @override
+  Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
+
   final calls = <Bbox>[];
   final pending = <Completer<List<Incident>>>[];
 
