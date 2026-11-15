@@ -147,6 +147,9 @@ class _InstructionsCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(8, 4, 16, 14),
         child: Column(
+          // Sin esto la columna ocupa todo el alto disponible y la tarjeta tapa
+          // el mapa entero, incluido el pin del centro
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextButton.icon(
@@ -158,6 +161,7 @@ class _InstructionsCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(left: 8),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
