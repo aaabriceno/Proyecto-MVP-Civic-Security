@@ -32,7 +32,10 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Center(
+          // Arriba y no centrado: en una tablet un formulario centrado en vertical
+          // deja un gran hueco encima y el teclado lo empuja fuera de la vista
+          child: Align(
+            alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 440),
               child: SingleChildScrollView(

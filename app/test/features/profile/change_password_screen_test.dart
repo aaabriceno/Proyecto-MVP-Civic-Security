@@ -43,6 +43,19 @@ void main() {
     expect(find.byKey(const Key('boton-cambiar-contrasena')), findsOneWidget);
   });
 
+  testWidgets('en una pantalla alta el formulario empieza arriba, no centrado', (
+    tester,
+  ) async {
+    await pumpProfile(tester, const ChangePasswordScreen(), repo: _repoOk());
+
+    final arriba = tester
+        .getTopLeft(find.byKey(const Key('campo-contrasena-actual')))
+        .dy;
+
+    // La pantalla de la prueba mide 1600 de alto: centrado quedaría pasando 500
+    expect(arriba, lessThan(300));
+  });
+
   testWidgets('las contraseñas empiezan ocultas y "Mostrar" las descubre', (
     tester,
   ) async {
