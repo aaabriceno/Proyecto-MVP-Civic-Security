@@ -15,7 +15,9 @@ void validateApiUrl(String url, {required bool release}) {
   }
 }
 
-final dioProvider = Provider<Dio>((ref) {
+/// Un cliente HTTP nuevo hacia la API. Lo usan [dioProvider] y el cliente con
+/// sesión (`sessionDioProvider`).
+Dio newApiClient() {
   validateApiUrl(apiUrl, release: kReleaseMode);
   return Dio(
     BaseOptions(
@@ -25,4 +27,7 @@ final dioProvider = Provider<Dio>((ref) {
       headers: {'accept': 'application/json'},
     ),
   );
-});
+}
+
+/// Cliente sin sesión: el registro, el inicio de sesión y todo lo público.
+final dioProvider = Provider<Dio>((ref) => newApiClient());

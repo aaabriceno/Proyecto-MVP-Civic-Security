@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:civic_security/core/network/api_failure.dart';
+import 'package:civic_security/core/network/auth_interceptor.dart';
 import 'package:civic_security/features/incident/data/incident_repository.dart';
 import 'package:civic_security/features/incident/domain/incident.dart';
 import 'package:civic_security/features/report/domain/new_incident.dart';
@@ -11,11 +12,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Simula el servidor: devuelve una respuesta fija y guarda la petición.
 class _FakeAdapter implements HttpClientAdapter {
-  _FakeAdapter(this.status, this.body, {this.error});
+  _FakeAdapter(this.status, this.body, {this.error, this.headers = const {}});
 
   final int status;
   final Object body;
   final DioException? error;
+  final Map<String, String> headers;
   RequestOptions? last;
 
   @override
@@ -31,6 +33,7 @@ class _FakeAdapter implements HttpClientAdapter {
       status,
       headers: {
         Headers.contentTypeHeader: ['application/json; charset=utf-8'],
+        for (final e in headers.entries) e.key: [e.value],
       },
     );
   }
@@ -62,7 +65,40 @@ HttpIncidentRepository _repo(_FakeAdapter adapter) {
   return HttpIncidentRepository(dio);
 }
 
+/// Un repositorio con el interceptor de sesión real y un access token fijo,
+/// como el que arma `sessionDioProvider`.
+HttpIncidentRepository _repoConSesion(_FakeAdapter adapter, String? token) {
+  final dio = Dio(BaseOptions(baseUrl: 'http://test'))
+    ..httpClientAdapter = adapter;
+  dio.interceptors.add(
+    AuthInterceptor(
+      dio: dio,
+      accessToken: () async => token,
+      refresh: () async => null,
+    ),
+  );
+  return HttpIncidentRepository(dio);
+}
+
 void main() {
+  test('leer el mapa NO manda la sesión, aunque haya una', () async {
+    final adapter = _FakeAdapter(200, {
+      'data': {'incidentes': <Object?>[]},
+    });
+
+    await _repoConSesion(adapter, 'access-1').fetchSnapshot(_bbox);
+
+    expect(adapter.last!.headers.containsKey('authorization'), isFalse);
+  });
+
+  test('el mapa se lee sin sesión (modo de solo lectura)', () async {
+    final adapter = _FakeAdapter(200, {
+      'data': {'incidentes': <Object?>[]},
+    });
+
+    expect(await _repoConSesion(adapter, null).fetchSnapshot(_bbox), isEmpty);
+  });
+
   test('pide /v1/map/snapshot con el bbox y devuelve los incidentes', () async {
     final adapter = _FakeAdapter(200, {
       'data': {
@@ -159,6 +195,61 @@ void main() {
       lng: -71.5,
     );
     const key = '0b1b6b0e-4f6e-4a0e-9d44-9a5d0e0f7a11';
+
+    test(
+      'reportar manda la sesión del usuario (Authorization: Bearer)',
+      () async {
+        final adapter = _FakeAdapter(201, {'data': _incident('nuevo')});
+
+        await _repoConSesion(
+          adapter,
+          'access-1',
+        ).create(input, idempotencyKey: key);
+
+        expect(adapter.last!.headers['authorization'], 'Bearer access-1');
+      },
+    );
+
+    test(
+      'sin sesión no se envía el reporte y falla con unauthorized',
+      () async {
+        final adapter = _FakeAdapter(201, {'data': _incident('nuevo')});
+
+        await expectLater(
+          _repoConSesion(adapter, null).create(input, idempotencyKey: key),
+          throwsA(
+            isA<ApiFailure>().having((e) => e.code, 'code', 'unauthorized'),
+          ),
+        );
+        expect(adapter.last, isNull, reason: 'no salió ninguna petición');
+      },
+    );
+
+    test('cupo diario agotado (429) -> ApiFailure con retry-after', () async {
+      final adapter = _FakeAdapter(
+        429,
+        {
+          'error': {
+            'code': 'report_quota_exceeded',
+            'message': 'Llegaste al límite de reportes de hoy.',
+          },
+        },
+        headers: {'retry-after': '3600'},
+      );
+
+      await expectLater(
+        _repoConSesion(adapter, 'access-1').create(input, idempotencyKey: key),
+        throwsA(
+          isA<ApiFailure>()
+              .having((e) => e.code, 'code', 'report_quota_exceeded')
+              .having(
+                (e) => e.retryAfter,
+                'retryAfter',
+                const Duration(hours: 1),
+              ),
+        ),
+      );
+    });
 
     test('hace POST /v1/incidents con la clave y el cuerpo', () async {
       final adapter = _FakeAdapter(201, {'data': _incident('nuevo')});
