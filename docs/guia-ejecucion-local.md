@@ -95,6 +95,15 @@ docker compose -f infra/docker-compose.yml ps
 
 Debe decir `Up ... (healthy)`.
 
+> **Si ya tenías una base creada con una versión anterior de la imagen** (PostGIS 3.5), al cambiar a la 3.7 verás en cada conexión el aviso `database "civic_dev" has a collation version mismatch`. La imagen nueva está basada en Debian 13 y la anterior en Debian 11, y cambió la biblioteca que ordena los textos. Se probó con 20 000 alias y los índices siguieron válidos, pero hay que dejarlo registrado. Una sola vez:
+>
+> ```bash
+> docker exec civic_db psql -U postgres -d civic_dev -c "ALTER DATABASE civic_dev REFRESH COLLATION VERSION"
+> docker exec civic_db psql -U postgres -d civic_dev -c "select postgis_extensions_upgrade()"
+> ```
+>
+> Si no tienes datos que guardar, es más simple empezar de cero (apartado 9, `down -v`).
+
 ### 3.3 Preparar el servidor
 
 ```bash
@@ -470,6 +479,7 @@ El **CI** de GitHub corre esto mismo en cada PR (el trabajo `Backend (Elixir)`, 
 | El chip **"Reconectando…"** no pasa a "En vivo" | El canal en tiempo real no llega al servidor | Mismo diagnóstico que "No se pudo conectar"; confirma que el servidor sigue encendido |
 | `mix phx.server` dice que el **puerto 4000 está en uso** | Quedó otro servidor corriendo | `ss -ltn \| grep 4000`; apaga el otro con `pkill -f "[p]hx\.server"` |
 | `mix setup` o el servidor no encuentran la base | El contenedor está apagado | `docker compose -f infra/docker-compose.yml up -d` |
+| `WARNING: database "civic_dev" has a collation version mismatch` | La base se creó con la imagen anterior de PostGIS y ahora corre con la nueva | Ejecuta los dos comandos de la nota del apartado 3.2 (una sola vez) |
 | Docker dice que el puerto **5432 ya está asignado** | Tienes otro PostgreSQL local usando ese puerto | Detén el PostgreSQL local (`sudo systemctl stop postgresql`) o cambia el puerto en `infra/docker-compose.yml` |
 | **"Demasiados intentos fallidos"** | 5 contraseñas incorrectas seguidas bloquean la cuenta (1 minuto, y se duplica) | Espera la cuenta regresiva o usa el comando del [apartado 6](#6-probar-el-flujo-de-cuentas) |
 | **"Hay demasiados intentos desde esta conexión"** | Límite de solicitudes por IP (en pruebas con muchas personas en la misma red) | Reinicia el servidor: los contadores viven en memoria y se reinician |
