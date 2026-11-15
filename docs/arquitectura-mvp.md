@@ -363,6 +363,8 @@ RETURNING estado, confirmaciones;
 4. Un job de Oban descarga la foto, **re-codifica otra vez en el servidor** (defensa en profundidad contra metadatos o archivos manipulados) y la marca `lista`.
 5. Para verla se generan URLs firmadas de corta duración; el bucket nunca es público.
 
+**Decisiones del MVP (2026-11-15):** (1) **sin difuminado de rostros** por ahora: queda como mejora (la pantalla avisa que se eviten rostros y placas); (2) **sí** se quitan los metadatos (GPS, modelo del teléfono, fecha): la app vuelve a dibujar la imagen en un lienzo nuevo y el servidor revisa el resultado (`Civic.Evidence.Jpeg`), sin re-codificar; (3) la foto viaja **cruda** (`PUT /v1/incidents/:id/photo`, `image/jpeg`, máximo 2 MB), sin URLs firmadas ni Oban, y se guarda detrás de `Civic.Evidence.Store` (disco hoy, bucket mañana); (4) **sin cifrado propio en reposo**: se usa el del proveedor (R2/S3 cifran por defecto; en un VPS, cifrado de disco) más permisos privados. El servidor **sí puede ver** las fotos, porque se muestran en el mapa público.
+
 **Entrega cifrada a autoridades (respuesta 17) — fase 2, fuera del MVP (confirmado).** Diseño previsto: la app cifra el **original sin difuminar** con la *clave pública de la autoridad* (cifrado híbrido, *sealed box* X25519 + XChaCha20-Poly1305) y lo sube como blob opaco. Ni el equipo ni el servidor pueden descifrarlo; solo la entidad con la clave privada. Requiere antes (a) una entidad con convenio que tenga la clave, y (b) base legal para subir rostros de terceros sin difuminar según la Ley 29733.
 
 ---

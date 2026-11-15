@@ -438,6 +438,28 @@ CIVIC_CUPO_SIN_VERIFICAR=50 mix phx.server
 
 Reenviar el mismo reporte (mala señal) no gasta cupo. Del autor, el servidor guarda solo un código que cambia en cada reporte, nunca el id de la cuenta.
 
+### Foto en un reporte
+
+En el formulario de reporte, **Foto (opcional)**: **Cámara** o **Galería**.
+
+- **Permisos:** la app **no** pide permiso de cámara ni de galería (el APK solo declara internet y ubicación). Abre la **cámara del sistema** o el **selector de fotos del sistema**, que dice en pantalla *"Esta app solo puede acceder a las fotos que selecciones"*: la app solo recibe la imagen que la persona elige, nunca puede recorrer la galería.
+- **Antes de enviar**, la app dibuja la imagen en un lienzo nuevo y la vuelve a codificar a JPEG de 1280 px como máximo. Así **no pasa nada de lo que la foto traía escondido**: GPS, modelo y número de serie del teléfono, fecha, comentarios, perfil de color. La rotación sí se conserva (se aplica a los píxeles).
+- **El servidor vuelve a comprobarlo** y rechaza (422 `photo_has_metadata`) cualquier JPEG con un segmento de metadatos, sin fiarse de la app. Solo acepta `image/jpeg` de hasta 2 MB y 4096 px por lado.
+- **Solo el autor** del reporte puede subirla (`PUT /v1/incidents/:id/photo`), **una sola vez**. Verla es público (`GET`), como el mapa. Si el reporte se descarta, su foto deja de mostrarse.
+- La foto se sube **después** de crear el reporte. Si falla (mala señal), el reporte ya existe y la pantalla de "Reporte enviado" ofrece **Reintentar**.
+- **No se difuminan rostros ni placas** (fuera del MVP): la pantalla avisa que se eviten. El servidor sí puede ver la foto, porque se muestra en el mapa público.
+
+Dónde queda guardada (solo en desarrollo): `backend/priv/uploads/<id-del-reporte>.jpg`, con permisos `0600` en una carpeta `0700`, ignorada por Git. En producción la carpeta la define `CIVIC_UPLOADS_DIR`.
+
+Para comprobar con tus propios ojos que la foto guardada no trae datos ocultos (necesitas `exiftool`):
+
+```bash
+# La original, desde tu galería o con GPS de prueba
+exiftool -Make -Model -GPSLatitude -GPSLongitude -DateTimeOriginal foto_original.jpg
+# La que quedó en el servidor: no debe mostrar ninguna de esas etiquetas
+exiftool -a -G1 backend/priv/uploads/<id-del-reporte>.jpg | grep -v -E '^\[(File|JFIF|Composite|ExifTool|System)\]'
+```
+
 ---
 
 ## 8. Pruebas automáticas
@@ -530,6 +552,7 @@ La guía de despliegue completa queda pendiente. Estas son las variables que el 
 | `DATABASE_URL` | Conexión a PostgreSQL |
 | `SECRET_KEY_BASE` | Secreto del servidor (firma los tokens de acceso) |
 | `CIVIC_KEY_VERIF_V1`, `CIVIC_KEY_REP_V1`, `CIVIC_KEY_VOTE_V1` | Tres claves independientes (base64 de 32 bytes cada una) para el DNI, los reportes y los votos |
+| `CIVIC_UPLOADS_DIR` | Carpeta de las fotos de los reportes en producción (privada: solo la lee el usuario que corre el programa; `0700`) |
 | `CLIENT_IP_HEADER` | Cabecera con la IP real del cliente cuando hay un proxy delante |
 | `POOL_SIZE`, `ECTO_IPV6`, `DNS_CLUSTER_QUERY` | Ajustes opcionales |
 
