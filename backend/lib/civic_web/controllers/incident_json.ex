@@ -18,6 +18,7 @@ defmodule CivicWeb.IncidentJSON do
       lat: lat,
       lng: lng,
       estado: incident.estado,
+      tiene_foto: incident.tiene_foto,
       creado_en: incident.inserted_at
     }
   end

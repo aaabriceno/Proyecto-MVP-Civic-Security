@@ -69,6 +69,21 @@ defmodule CivicWeb.Router do
     post "/incidents", IncidentController, :create
   end
 
+  # La foto de un reporte. Van sin el pipeline :api: el cuerpo no es JSON y quien
+  # pide la imagen manda `Accept: image/jpeg`. Subirla exige ser el autor.
+  scope "/v1", CivicWeb do
+    pipe_through [:limit_write, :authenticate]
+
+    put "/incidents/:id/photo", PhotoController, :create
+  end
+
+  # Verla es público, como el mapa (los reportes también lo son)
+  scope "/v1", CivicWeb do
+    pipe_through [:limit_read]
+
+    get "/incidents/:id/photo", PhotoController, :show
+  end
+
   scope "/v1", CivicWeb do
     pipe_through [:api, :limit_read]
 

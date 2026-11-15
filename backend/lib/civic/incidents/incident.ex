@@ -42,6 +42,10 @@ defmodule Civic.Incidents.Incident do
     # HMAC(k_rep, cuenta ‖ incidente). Nunca viene del cliente ni se muestra.
     field :reporter_token, :binary, redact: true
 
+    # ¿El autor subió una foto? El archivo vive en Civic.Evidence. Nunca viene del
+    # cliente al crear: no está en `cast`, solo lo cambia Civic.Evidence.
+    field :tiene_foto, :boolean, default: false
+
     field :lat, :float, virtual: true
     field :lng, :float, virtual: true
 

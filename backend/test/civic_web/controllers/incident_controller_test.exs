@@ -55,7 +55,7 @@ defmodule CivicWeb.IncidentControllerTest do
            } = data
 
     assert Map.keys(data) |> Enum.sort() ==
-             ["creado_en", "descripcion", "estado", "id", "lat", "lng", "tipo"]
+             ["creado_en", "descripcion", "estado", "id", "lat", "lng", "tiene_foto", "tipo"]
   end
 
   test "200 al repetir la misma idempotency-key devuelve el mismo id", %{conn: conn, user: user} do

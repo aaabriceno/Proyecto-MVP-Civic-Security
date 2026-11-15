@@ -83,4 +83,12 @@ config :argon2_elixir, argon2_type: 2, t_cost: 3, m_cost: 15, parallelism: 1
 # variables de entorno (config/runtime.exs).
 config :civic, Civic.Privacy, current: %{verif: 1, rep: 1, vote: 1}
 
+# Dónde se guardan las fotos de los reportes (ver Civic.Evidence). En desarrollo,
+# una carpeta dentro del proyecto que Git ignora; en producción la define
+# CIVIC_UPLOADS_DIR (config/runtime.exs). Para pasar a un bucket (R2/S3) se
+# cambia `store` por otro módulo que cumpla Civic.Evidence.Store.
+config :civic, Civic.Evidence,
+  store: Civic.Evidence.Store.Disk,
+  root: Path.expand("../priv/uploads", __DIR__)
+
 import_config "#{config_env()}.exs"

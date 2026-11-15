@@ -149,3 +149,6 @@ desktop.ini
 *.out
 *.vrb
 *.synctex.gz
+
+# Fotos de los reportes en desarrollo (backend/lib/civic/evidence)
+backend/priv/uploads/

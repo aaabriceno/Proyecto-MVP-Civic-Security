@@ -29,6 +29,10 @@ defmodule CivicWeb.Endpoint do
   # responden 415.
   plug Plug.Parsers,
     parsers: [:json],
+    # Las fotos llegan como el cuerpo crudo de la petición (image/jpeg): el
+    # parser las deja pasar sin leerlas y PhotoController las lee con su propio
+    # tope de tamaño. Cualquier otro tipo sigue dando 415.
+    pass: ["image/jpeg"],
     length: 8_192,
     json_decoder: Phoenix.json_library()
 

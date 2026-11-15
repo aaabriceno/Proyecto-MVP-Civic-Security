@@ -57,3 +57,9 @@ config :civic, CivicWeb.RateLimit,
   register: {100_000, :timer.minutes(1)},
   login: {100_000, :timer.minutes(1)},
   refresh: {100_000, :timer.minutes(1)}
+
+# Las fotos de las pruebas van a una carpeta temporal que se borra al terminar
+# (ver test_helper.exs)
+config :civic, Civic.Evidence,
+  store: Civic.Evidence.Store.Disk,
+  root: Path.join(System.tmp_dir!(), "civic_test_uploads_#{System.get_env("MIX_TEST_PARTITION")}")

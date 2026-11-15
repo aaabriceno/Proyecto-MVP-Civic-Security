@@ -98,6 +98,80 @@ defmodule CivicWeb.FallbackController do
     })
   end
 
+  def call(conn, {:error, :not_found}) do
+    conn
+    |> put_status(:not_found)
+    |> json(%{error: %{code: "not_found", message: "No encontrado"}})
+  end
+
+  # Solo quien hizo el reporte puede agregarle la foto
+  def call(conn, {:error, :not_author}) do
+    conn
+    |> put_status(:forbidden)
+    |> json(%{
+      error: %{
+        code: "not_author",
+        message: "Solo quien hizo el reporte puede agregarle una foto"
+      }
+    })
+  end
+
+  def call(conn, {:error, :photo_exists}) do
+    conn
+    |> put_status(:conflict)
+    |> json(%{error: %{code: "photo_exists", message: "Este reporte ya tiene una foto"}})
+  end
+
+  def call(conn, {:error, :photo_too_large}) do
+    conn
+    |> put_status(:request_entity_too_large)
+    |> json(%{
+      error: %{code: "photo_too_large", message: "La foto es demasiado pesada (máximo 2 MB)"}
+    })
+  end
+
+  def call(conn, {:error, :unsupported_media_type}) do
+    conn
+    |> put_status(:unsupported_media_type)
+    |> json(%{
+      error: %{code: "unsupported_media_type", message: "La foto debe enviarse como image/jpeg"}
+    })
+  end
+
+  # El archivo no se pudo guardar: no es culpa de quien lo envía, que puede reintentar
+  def call(conn, {:error, :storage}) do
+    conn
+    |> put_resp_header("retry-after", "5")
+    |> put_status(:service_unavailable)
+    |> json(%{
+      error: %{
+        code: "storage_unavailable",
+        message: "No pudimos guardar la foto. Intenta de nuevo en un momento."
+      }
+    })
+  end
+
+  def call(conn, {:error, {:invalid_photo, :has_metadata}}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{
+      error: %{
+        code: "photo_has_metadata",
+        message:
+          "La foto trae datos ocultos (ubicación, modelo del teléfono o fecha). " <>
+            "Se envía desde la app, que los quita."
+      }
+    })
+  end
+
+  def call(conn, {:error, {:invalid_photo, _reason}}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{
+      error: %{code: "invalid_photo", message: "El archivo no es una foto JPEG válida"}
+    })
+  end
+
   def call(conn, {:error, :invalid_window}) do
     conn
     |> put_status(:bad_request)

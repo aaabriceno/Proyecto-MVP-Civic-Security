@@ -93,6 +93,17 @@ if config_env() == :prod do
       {:vote, 1} => privacy_key.("CIVIC_KEY_VOTE_V1")
     }
 
+  # Carpeta de las fotos de los reportes (ver Civic.Evidence.Store.Disk). Debe ser
+  # privada: solo el usuario que corre el programa la lee y escribe. Con un bucket
+  # (R2/S3) se cambia el `store` y esta variable ya no se usa.
+  config :civic, Civic.Evidence,
+    root:
+      System.get_env("CIVIC_UPLOADS_DIR") ||
+        raise("""
+        environment variable CIVIC_UPLOADS_DIR is missing.
+        For example: /var/lib/civic/uploads (owned by the app user, mode 0700)
+        """)
+
   host = System.get_env("PHX_HOST") || "example.com"
 
   # Solo si hay un proxy que SOBRESCRIBE esta cabecera (p. ej. fly-client-ip en
