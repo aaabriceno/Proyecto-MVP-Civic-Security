@@ -20,6 +20,7 @@ import 'live_map_controller.dart';
 import 'live_status_chip.dart';
 import 'map_incidents_controller.dart';
 import 'map_providers.dart';
+import 'map_tiles.dart';
 import 'type_filter_bar.dart';
 
 const _zoomInicial = 16.0;
@@ -64,6 +65,9 @@ class _MapScreenState extends ConsumerState<MapScreen>
   LatLng? _pendingTarget;
   Timer? _loadTimer;
 
+  // Mosaicos del mapa y su aviso de "mapa incompleto"
+  final _tiles = MapTiles();
+
   // Para que el botón de ubicación suba junto con la hoja inferior
   final _sheetExtent = ValueNotifier<double>(_extentInicialHoja);
 
@@ -80,6 +84,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _loadTimer?.cancel();
+    _tiles.dispose();
     _sheetExtent.dispose();
     if (widget.mapController == null) _controller.dispose();
     super.dispose();
@@ -242,11 +247,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
               },
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'pe.civicsecurity.civic_security',
-                tileProvider: ref.watch(tileProviderProvider),
-              ),
+              _tiles.layer(ref.watch(tileProviderProvider)),
               // Círculo de precisión: "estás en algún lugar de este círculo".
               // Va debajo del punto, y se omite si el sistema no informó la precisión.
               if (userPosition != null && userAccuracy != null)
@@ -324,6 +325,7 @@ class _MapScreenState extends ConsumerState<MapScreen>
                     ),
                   _locationBanner(location),
                   _dataBanner(data),
+                  _tiles.banner(),
                 ],
               ),
             ),

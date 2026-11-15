@@ -24,6 +24,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'failing_tiles.dart';
 import 'fake_incident_stream.dart';
 
 /// Posición dentro de Arequipa (Paucarpata), lejos del centro de la vista inicial.
@@ -163,6 +164,7 @@ Future<MapController> _pumpMap(
   _FakeAuth? auth,
   bool readOnly = false,
   VoidCallback? onSignIn,
+  TileProvider? tiles,
 }) async {
   // Pantalla alta (la fuente de los tests es más ancha que la real)
   tester.view.physicalSize = const Size(1000, 1600);
@@ -179,7 +181,7 @@ Future<MapController> _pumpMap(
         incidentStreamProvider.overrideWithValue(
           stream ?? FakeIncidentStream(),
         ),
-        tileProviderProvider.overrideWithValue(_BlankTileProvider()),
+        tileProviderProvider.overrideWithValue(tiles ?? _BlankTileProvider()),
         profileProvider.overrideWith((ref) async => _cuentaDePrueba),
         heatRepositoryProvider.overrideWithValue(_FakeHeatRepo()),
         if (auth != null) authControllerProvider.overrideWith(() => auth),
@@ -892,5 +894,77 @@ void main() {
   test('arequipaBounds reconoce puntos dentro y fuera', () {
     expect(arequipaBounds.contains(_enArequipa), isTrue);
     expect(arequipaBounds.contains(const LatLng(-12.0464, -77.0428)), isFalse);
+  });
+
+  group('mosaicos del mapa que no cargan', () {
+    Future<void> settle(WidgetTester tester) async {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+    }
+
+    testWidgets('si cargan bien, no hay aviso', (tester) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+      );
+
+      expect(find.byKey(const Key('aviso-mosaicos')), findsNothing);
+    });
+
+    testWidgets('si fallan, avisa que el mapa quedó incompleto', (
+      tester,
+    ) async {
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+        tiles: FailingTileProvider(),
+      );
+      await settle(tester);
+
+      expect(find.byKey(const Key('aviso-mosaicos')), findsOneWidget);
+    });
+
+    testWidgets(
+      '"Reintentar" vuelve a pedirlos y, si ya cargan, el aviso se va',
+      (tester) async {
+        final tiles = FailingTileProvider();
+        await _pumpMap(
+          tester,
+          _FakeLocationService(const LocationFound(_enArequipa)),
+          tiles: tiles,
+        );
+        await settle(tester);
+        expect(find.byKey(const Key('aviso-mosaicos')), findsOneWidget);
+        final antes = tiles.requests;
+
+        tiles.failing = false;
+        await tester.tap(find.byKey(const Key('boton-reintentar-mosaicos')));
+        await settle(tester);
+
+        expect(
+          tiles.requests,
+          greaterThan(antes),
+          reason: 'los pidió de nuevo',
+        );
+        expect(find.byKey(const Key('aviso-mosaicos')), findsNothing);
+      },
+    );
+
+    testWidgets('si siguen fallando tras reintentar, el aviso vuelve', (
+      tester,
+    ) async {
+      final tiles = FailingTileProvider();
+      await _pumpMap(
+        tester,
+        _FakeLocationService(const LocationFound(_enArequipa)),
+        tiles: tiles,
+      );
+      await settle(tester);
+
+      await tester.tap(find.byKey(const Key('boton-reintentar-mosaicos')));
+      await settle(tester);
+
+      expect(find.byKey(const Key('aviso-mosaicos')), findsOneWidget);
+    });
   });
 }

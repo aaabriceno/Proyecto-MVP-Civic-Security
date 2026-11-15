@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../incident/domain/incident.dart';
 import '../../map/presentation/map_providers.dart';
+import '../../map/presentation/map_tiles.dart';
 import '../domain/heat_map.dart';
 import 'heat_controller.dart';
 import 'heat_style.dart';
@@ -44,9 +45,13 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
   bool _mapReady = false;
   HeatCell? _selected;
 
+  // Mosaicos del mapa y su aviso de "mapa incompleto"
+  final _tiles = MapTiles();
+
   @override
   void dispose() {
     _loadTimer?.cancel();
+    _tiles.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -133,11 +138,7 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
               },
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'pe.civicsecurity.civic_security',
-                tileProvider: ref.watch(tileProviderProvider),
-              ),
+              _tiles.layer(ref.watch(tileProviderProvider)),
               if (data != null)
                 CircleLayer(circles: heatCircles(data, selected: _selected)),
               const SimpleAttributionWidget(
@@ -183,6 +184,7 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                         text: 'Sin reportes en esta zona y período.',
                       ),
                     ),
+                  _tiles.banner(),
                 ],
               ),
             ),
