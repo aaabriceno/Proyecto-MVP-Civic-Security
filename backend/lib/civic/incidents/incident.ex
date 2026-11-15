@@ -39,6 +39,9 @@ defmodule Civic.Incidents.Incident do
 
     field :idempotency_key, Ecto.UUID
 
+    # HMAC(k_rep, cuenta ‖ incidente). Nunca viene del cliente ni se muestra.
+    field :reporter_token, :binary, redact: true
+
     field :lat, :float, virtual: true
     field :lng, :float, virtual: true
 

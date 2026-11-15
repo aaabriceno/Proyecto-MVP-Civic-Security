@@ -51,6 +51,13 @@ config :civic, CivicWeb.RateLimit,
   login: {120, :timer.minutes(10)},
   refresh: {200, :timer.minutes(10)}
 
+# Cupo de reportes NUEVOS por cuenta (ver Civic.Incidents.report_incident/3).
+# Solo en memoria: se reinicia con el servidor y no deja rastro en la base.
+# Repetir un envío con la misma idempotency-key no gasta cupo.
+config :civic, Civic.Incidents.Quota,
+  sin_verificar: {3, :timer.hours(24)},
+  verificado: {10, :timer.hours(24)}
+
 # Cuántos registros/inicios de sesión se atienden a la vez (ver Civic.HashGate).
 # Pasado el tope se responde 503 al instante. Con ~50 ms por hash, 8 a la vez
 # cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
