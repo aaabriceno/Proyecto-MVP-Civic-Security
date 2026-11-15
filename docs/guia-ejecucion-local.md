@@ -344,11 +344,43 @@ Con el servidor y la app corriendo:
 - **5 intentos fallidos seguidos** bloquean la cuenta (un minuto la primera vez; la espera se duplica si se sigue fallando, hasta 15 minutos). La app muestra una cuenta regresiva y deshabilita el botón. El aviso de bloqueo sale en el **6.º** intento.
 - Apagar el servidor y abrir la app: entra al mapa con el aviso "Sin conexión: no pudimos confirmar tu sesión" y **se recupera sola** (en menos de 30 s) cuando enciendes el servidor.
 
-### Ver qué quedó guardado
+### Dónde está la base de datos y cómo mirarla
+
+**No hay ningún archivo de base de datos dentro de las carpetas del proyecto**, y es lo normal. Los datos viven en un **volumen de Docker** (`infra_civic_pgdata`, definido en [infra/docker-compose.yml](../infra/docker-compose.yml)), que Docker guarda fuera del proyecto, en `/var/lib/docker/volumes/`. Son archivos internos de PostgreSQL: no se leen a mano ni se suben a GitHub. Lo que sí está en el repositorio es **la receta** para volver a crearla:
+
+| Qué | Dónde |
+|---|---|
+| Cómo se levanta el contenedor (usuario, base, puerto, volumen) | [infra/docker-compose.yml](../infra/docker-compose.yml) |
+| Cómo se crean las tablas | [backend/priv/repo/migrations/](../backend/priv/repo/migrations/) |
+| Los 80 incidentes de prueba | [backend/priv/repo/seeds.exs](../backend/priv/repo/seeds.exs) |
+| Consultas de demostración | [backend/priv/repo/demo_consultas.sql](../backend/priv/repo/demo_consultas.sql) |
+
+**Entrar a mirarla** (el contenedor tiene que estar arriba):
+
+```bash
+docker exec -it civic_db psql -U postgres -d civic_dev
+```
+
+Dentro verás el prompt `civic_dev=#`. Comandos útiles:
+
+| Escribe | Qué hace |
+|---|---|
+| `\pset pager off` | Evita que los resultados largos se queden en `:`. Hazlo primero |
+| `\dt public.*` | Lista **solo tus tablas**: `usuarios`, `consentimientos`, `refresh_tokens`, `incidentes` |
+| `\d usuarios` | Muestra las columnas de una tabla |
+| `select alias, nivel, intentos_fallidos from usuarios;` | Consulta las cuentas (toda consulta SQL termina en `;`) |
+| `\x` | Alterna la vista vertical, más cómoda para filas anchas |
+| `\q` | Sale de psql |
+
+> Si usas `\dt` sin `public.*` salen también unas 30 tablas del esquema `tiger`, que son de PostGIS y no tuyas, y el resultado queda en una pantalla con `:` abajo. Pulsa **`q`** para salir de ella.
+
+Una consulta suelta, sin entrar:
 
 ```bash
 docker exec civic_db psql -U postgres -d civic_dev -c "select alias, nivel, intentos_fallidos from usuarios"
 ```
+
+**Con una herramienta gráfica** (DBeaver, pgAdmin o una extensión de VS Code como SQLTools): servidor `localhost`, puerto `5432`, usuario `postgres`, contraseña `postgres`, base `civic_dev`. Es una contraseña de desarrollo y el puerto solo acepta conexiones de tu propia computadora.
 
 Lo que **nunca** se guarda en la base: contraseñas (solo su hash Argon2id), nombre, teléfono, correo ni IP.
 
@@ -432,7 +464,7 @@ El **CI** de GitHub corre esto mismo en cada PR (el trabajo `Backend (Elixir)`, 
 | `adb devices` sale vacío | Cable que solo carga, depuración USB apagada o modo de USB incorrecto | Cambia de cable o puerto; en la tablet elige "Transferencia de archivos" y activa la depuración USB |
 | `adb devices` dice `unauthorized` | No aceptaste el aviso de la tablet | Mira la pantalla de la tablet y acepta "Permitir depuración" (con "Permitir siempre"). Si tiene PIN o patrón, **desbloquéala**: con la pantalla bloqueada el aviso no sale. Si aun así no aparece: desconecta y reconecta; y si sigue igual, en Opciones de desarrollador toca **"Revocar autorizaciones de depuración USB"** y vuelve a conectar el cable |
 | `adb devices` dice `offline` | Conexión de `adb` colgada | `adb kill-server` y vuelve a `adb devices` |
-| **Mapa gris**, sin calles | La tablet no tiene internet (los mosaicos vienen de OpenStreetMap) | Conecta la tablet a una red con internet |
+| **Mapa gris**, o que carga solo **por zonas** (también al elegir la ubicación de un reporte) | El mapa se arma con cuadritos que se descargan uno por uno desde OpenStreetMap. Los que no llegan quedan grises: conexión lenta o inestable (hotspot, Wi-Fi de universidad) o límite de descargas del servidor público de OpenStreetMap | Abre `https://www.openstreetmap.org` en Chrome de la tablet: si ahí también carga a pedazos, es la red. Prueba con otra red. Con `flutter run` abierto, cada cuadro fallido deja una línea con `tile.openstreetmap.org` en la terminal. Las zonas ya vistas se guardan y salen al instante |
 | **"Sin reportes en esta zona"** | Los datos de prueba tienen más de 24 h | Mira el [apartado 7](#7-datos-de-demostración-los-pines-del-mapa) |
 | **"Buscando tu ubicación…"** no termina | Permiso o GPS apagado, o estás bajo techo | Acepta el permiso de ubicación; enciende la ubicación del sistema; sal a un lugar abierto |
 | El chip **"Reconectando…"** no pasa a "En vivo" | El canal en tiempo real no llega al servidor | Mismo diagnóstico que "No se pudo conectar"; confirma que el servidor sigue encendido |
