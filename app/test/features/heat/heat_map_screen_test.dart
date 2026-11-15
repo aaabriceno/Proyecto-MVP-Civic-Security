@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../map/failing_tiles.dart';
 import '../report/blank_tiles.dart';
 
 const _centro = LatLng(-16.4090, -71.5370);
@@ -50,7 +51,11 @@ class _Outcome {
   LatLng? value;
 }
 
-Future<_Outcome> _pump(WidgetTester tester, _FakeRepo repo) async {
+Future<_Outcome> _pump(
+  WidgetTester tester,
+  _FakeRepo repo, {
+  TileProvider? tiles,
+}) async {
   tester.view.physicalSize = const Size(1000, 1600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -59,7 +64,7 @@ Future<_Outcome> _pump(WidgetTester tester, _FakeRepo repo) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        tileProviderProvider.overrideWithValue(BlankTileProvider()),
+        tileProviderProvider.overrideWithValue(tiles ?? BlankTileProvider()),
         heatRepositoryProvider.overrideWithValue(repo),
       ],
       child: MaterialApp(
@@ -336,5 +341,41 @@ void main() {
     await tester.tap(find.byKey(const Key('zoom-menos')));
     await tester.pumpAndSettle();
     expect(controller.camera.zoom, lessThan(inicial));
+  });
+
+  group('mosaicos del mapa que no cargan', () {
+    testWidgets('si cargan bien, no hay aviso', (tester) async {
+      await _pump(tester, _FakeRepo(_conUnaCelda()));
+
+      expect(find.byKey(const Key('aviso-mosaicos')), findsNothing);
+    });
+
+    testWidgets('si fallan, avisa que el mapa quedó incompleto', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        _FakeRepo(_conUnaCelda()),
+        tiles: FailingTileProvider(),
+      );
+
+      expect(find.byKey(const Key('aviso-mosaicos')), findsOneWidget);
+    });
+
+    testWidgets(
+      '"Reintentar" los pide de nuevo y, si ya cargan, el aviso se va',
+      (tester) async {
+        final tiles = FailingTileProvider();
+        await _pump(tester, _FakeRepo(_conUnaCelda()), tiles: tiles);
+        final antes = tiles.requests;
+
+        tiles.failing = false;
+        await tester.tap(find.byKey(const Key('boton-reintentar-mosaicos')));
+        await tester.pumpAndSettle();
+
+        expect(tiles.requests, greaterThan(antes));
+        expect(find.byKey(const Key('aviso-mosaicos')), findsNothing);
+      },
+    );
   });
 }

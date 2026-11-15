@@ -6,6 +6,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/geo/arequipa.dart';
 import '../../map/presentation/incident_style.dart';
 import '../../map/presentation/map_providers.dart';
+import '../../map/presentation/map_tiles.dart';
 
 const _blue = Color(0xFF0A84FF);
 const _red = Color(0xFFDC2626);
@@ -37,8 +38,12 @@ class _AdjustLocationScreenState extends ConsumerState<AdjustLocationScreen> {
     widget.initialCenter,
   );
 
+  // Mosaicos del mapa y su aviso de "mapa incompleto"
+  final _tiles = MapTiles();
+
   @override
   void dispose() {
+    _tiles.dispose();
     _center.dispose();
     _controller.dispose();
     super.dispose();
@@ -68,11 +73,7 @@ class _AdjustLocationScreenState extends ConsumerState<AdjustLocationScreen> {
               onPositionChanged: (camera, _) => _center.value = camera.center,
             ),
             children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'pe.civicsecurity.civic_security',
-                tileProvider: ref.watch(tileProviderProvider),
-              ),
+              _tiles.layer(ref.watch(tileProviderProvider)),
               if (user != null)
                 MarkerLayer(
                   markers: [
@@ -112,8 +113,14 @@ class _AdjustLocationScreenState extends ConsumerState<AdjustLocationScreen> {
               padding: const EdgeInsets.all(12),
               child: Align(
                 alignment: Alignment.topCenter,
-                child: _InstructionsCard(
-                  onBack: () => Navigator.of(context).pop(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _InstructionsCard(
+                      onBack: () => Navigator.of(context).pop(),
+                    ),
+                    _tiles.banner(),
+                  ],
                 ),
               ),
             ),

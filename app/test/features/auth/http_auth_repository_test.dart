@@ -257,6 +257,73 @@ void main() {
     });
   });
 
+  group('verifyDni', () {
+    Map<String, dynamic> perfil() => {
+      'data': {
+        'id': '89e95dd3-b844-4c68-8186-c778448e407a',
+        'alias': 'Halcon-482',
+        'nivel': 'verificado',
+        'desde': '2026-11',
+        'cupo': {'usados': 0, 'maximo': 10},
+      },
+    };
+
+    test(
+      'hace POST /v1/verification/dni con la sesión y devuelve el perfil',
+      () async {
+        final adapter = FakeHttpAdapter(200, perfil());
+
+        final user = await _repo(
+          adapter,
+        ).verifyDni(accessToken: 'access-123', dni: '12345678');
+
+        expect(adapter.last!.method, 'POST');
+        expect(adapter.last!.path, '/v1/verification/dni');
+        expect(adapter.last!.headers['authorization'], 'Bearer access-123');
+        expect(adapter.last!.data, {'dni': '12345678'});
+        expect(user.nivel, AuthLevel.verificado);
+        expect(user.cupo?.maximo, 10);
+      },
+    );
+
+    test('un DNI que ya tiene cuenta llega como dni_taken', () async {
+      final adapter = FakeHttpAdapter(409, _errorBody('dni_taken'));
+
+      final failure = await _failureOf(
+        () => _repo(adapter).verifyDni(accessToken: 'a', dni: '12345678'),
+      );
+
+      expect(failure.code, 'dni_taken');
+    });
+
+    test('sin intentos del día trae la espera', () async {
+      final adapter = FakeHttpAdapter(
+        429,
+        _errorBody('dni_attempts_exceeded'),
+        headers: {
+          'retry-after': ['3600'],
+        },
+      );
+
+      final failure = await _failureOf(
+        () => _repo(adapter).verifyDni(accessToken: 'a', dni: '12345678'),
+      );
+
+      expect(failure.code, 'dni_attempts_exceeded');
+      expect(failure.retryAfter, const Duration(hours: 1));
+    });
+
+    test('una respuesta sin perfil -> invalid_response', () async {
+      final adapter = FakeHttpAdapter(200, {'data': 'nada'});
+
+      final failure = await _failureOf(
+        () => _repo(adapter).verifyDni(accessToken: 'a', dni: '12345678'),
+      );
+
+      expect(failure.code, 'invalid_response');
+    });
+  });
+
   group('lo que NO se envía', () {
     test(
       'registro, login, refresh y logout no mandan cabecera Authorization',

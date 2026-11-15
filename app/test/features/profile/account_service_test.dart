@@ -47,6 +47,32 @@ void main() {
     });
   });
 
+  group('verifyDni', () {
+    test('manda el DNI con la sesión actual y devuelve la cuenta', () async {
+      await session.start(tokens('access-1', 'refresh-1'));
+      repo.onVerifyDni = (_, _) async => const AuthUser(
+        id: '89e95dd3-b844-4c68-8186-c778448e407a',
+        alias: 'Halcon-482',
+        nivel: AuthLevel.verificado,
+      );
+
+      final user = await service.verifyDni('12345678');
+
+      expect(user.nivel, AuthLevel.verificado);
+      expect(repo.verifyDniCalls, ['12345678']);
+    });
+
+    test('sin sesión falla con unauthorized y no llama al servidor', () async {
+      await expectLater(
+        service.verifyDni('12345678'),
+        throwsA(
+          isA<ApiFailure>().having((e) => e.code, 'code', 'unauthorized'),
+        ),
+      );
+      expect(repo.verifyDniCalls, isEmpty);
+    });
+  });
+
   group('changePassword', () {
     setUp(() async {
       await session.start(tokens('access-1', 'refresh-1'));
