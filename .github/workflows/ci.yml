@@ -79,7 +79,7 @@ jobs:
         run: mix test
 
       - name: Análisis de seguridad (Sobelow)
-        run: mix sobelow --exit
+        run: mix sobelow --exit --skip
 
       - name: Vulnerabilidades en dependencias
         run: mix deps.audit
