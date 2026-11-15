@@ -43,6 +43,15 @@ abstract interface class AuthRepository {
     required String accessToken,
     required String password,
   });
+
+  /// Verifica la cuenta con el DNI y devuelve su perfil ya como verificada. El
+  /// servidor guarda solo una huella irreversible del número, nunca el número.
+  /// Fallos: 409 `dni_taken` (ya tiene otra cuenta) o `already_verified`, 422
+  /// con el campo `dni` (formato) y 429 `dni_attempts_exceeded`.
+  Future<AuthUser> verifyDni({
+    required String accessToken,
+    required String dni,
+  });
 }
 
 class HttpAuthRepository implements AuthRepository {
@@ -94,11 +103,20 @@ class HttpAuthRepository implements AuthRepository {
       '/v1/me',
       options: Options(headers: {'authorization': 'Bearer $accessToken'}),
     );
-    final user = _data(response.data) == null
-        ? null
-        : AuthUser.tryFromJson(_data(response.data)!);
-    if (user == null) throw const ApiFailure.invalidResponse();
-    return user;
+    return _user(response.data);
+  });
+
+  @override
+  Future<AuthUser> verifyDni({
+    required String accessToken,
+    required String dni,
+  }) => _guard(() async {
+    final response = await _dio.post<Object?>(
+      '/v1/verification/dni',
+      data: {'dni': dni},
+      options: Options(headers: {'authorization': 'Bearer $accessToken'}),
+    );
+    return _user(response.data);
   });
 
   @override
@@ -138,6 +156,14 @@ class HttpAuthRepository implements AuthRepository {
         if (session == null) throw const ApiFailure.invalidResponse();
         return session;
       });
+
+  /// La cuenta de una respuesta `{"data": {...}}`; si no tiene esa forma, falla.
+  AuthUser _user(Object? body) {
+    final data = _data(body);
+    final user = data == null ? null : AuthUser.tryFromJson(data);
+    if (user == null) throw const ApiFailure.invalidResponse();
+    return user;
+  }
 
   /// El contenido de `{"data": {...}}`, o `null` si la respuesta no tiene esa forma.
   Map<String, dynamic>? _data(Object? body) {

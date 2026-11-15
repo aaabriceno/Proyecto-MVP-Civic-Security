@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../map/failing_tiles.dart';
 import 'blank_tiles.dart';
 
 const _enArequipa = LatLng(-16.4300, -71.5050);
@@ -22,6 +23,7 @@ Future<_Outcome> _pump(
   WidgetTester tester, {
   LatLng initial = _enArequipa,
   LatLng? user,
+  TileProvider? tiles,
 }) async {
   tester.view.physicalSize = const Size(1000, 1600);
   tester.view.devicePixelRatio = 1;
@@ -30,7 +32,9 @@ Future<_Outcome> _pump(
   final outcome = _Outcome();
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [tileProviderProvider.overrideWithValue(BlankTileProvider())],
+      overrides: [
+        tileProviderProvider.overrideWithValue(tiles ?? BlankTileProvider()),
+      ],
       child: MaterialApp(
         home: Builder(
           builder: (context) => TextButton(
@@ -227,5 +231,51 @@ void main() {
 
     expect(outcome.closed, isTrue);
     expect(outcome.value, isNull);
+  });
+
+  group('mosaicos del mapa que no cargan', () {
+    testWidgets('si cargan bien, no hay aviso', (tester) async {
+      await _pump(tester);
+
+      expect(find.byKey(const Key('aviso-mosaicos')), findsNothing);
+    });
+
+    testWidgets('si fallan, avisa que el mapa quedó incompleto', (
+      tester,
+    ) async {
+      await _pump(tester, tiles: FailingTileProvider());
+
+      expect(find.byKey(const Key('aviso-mosaicos')), findsOneWidget);
+    });
+
+    testWidgets('el aviso no tapa el pin ni los botones de abajo', (
+      tester,
+    ) async {
+      await _pump(tester, tiles: FailingTileProvider());
+
+      final aviso = tester.getRect(find.byKey(const Key('aviso-mosaicos')));
+      final pin = tester.getCenter(find.byKey(const Key('pin-central')));
+      expect(aviso.contains(pin), isFalse);
+      final abajo = tester.getTopLeft(
+        find.byKey(const Key('confirmar-ubicacion')),
+      );
+      expect(aviso.bottom, lessThan(abajo.dy));
+    });
+
+    testWidgets(
+      '"Reintentar" los pide de nuevo y, si ya cargan, el aviso se va',
+      (tester) async {
+        final tiles = FailingTileProvider();
+        await _pump(tester, tiles: tiles);
+        final antes = tiles.requests;
+
+        tiles.failing = false;
+        await tester.tap(find.byKey(const Key('boton-reintentar-mosaicos')));
+        await tester.pumpAndSettle();
+
+        expect(tiles.requests, greaterThan(antes));
+        expect(find.byKey(const Key('aviso-mosaicos')), findsNothing);
+      },
+    );
   });
 }

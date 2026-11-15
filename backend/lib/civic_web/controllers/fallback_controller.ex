@@ -47,6 +47,46 @@ defmodule CivicWeb.FallbackController do
     })
   end
 
+  # El DNI no tiene 8 dígitos. Nunca se repite lo que escribió la persona.
+  def call(conn, {:error, :invalid_dni}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{
+      error: %{
+        code: "validation_failed",
+        message: "Datos inválidos",
+        fields: %{dni: ["debe tener 8 dígitos"]}
+      }
+    })
+  end
+
+  def call(conn, {:error, :dni_taken}) do
+    conn
+    |> put_status(:conflict)
+    |> json(%{
+      error: %{code: "dni_taken", message: "Este DNI ya tiene una cuenta"}
+    })
+  end
+
+  def call(conn, {:error, :already_verified}) do
+    conn
+    |> put_status(:conflict)
+    |> json(%{error: %{code: "already_verified", message: "Tu cuenta ya está verificada"}})
+  end
+
+  # Se acabaron los intentos de verificar el DNI del día
+  def call(conn, {:error, {:attempts_exceeded, retry_ms}}) do
+    conn
+    |> put_resp_header("retry-after", Integer.to_string(max(div(retry_ms + 999, 1000), 1)))
+    |> put_status(:too_many_requests)
+    |> json(%{
+      error: %{
+        code: "dni_attempts_exceeded",
+        message: "Llegaste al límite de intentos de hoy. Intenta de nuevo más tarde."
+      }
+    })
+  end
+
   # Mismo mensaje para "alias que no existe" y "contraseña equivocada"
   def call(conn, {:error, :invalid_credentials}) do
     conn

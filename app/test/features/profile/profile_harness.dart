@@ -55,6 +55,9 @@ Future<Harness> pumpProfile(
   /// `false` si la pantalla tiene una animación infinita (un indicador de
   /// carga): `pumpAndSettle` no terminaría nunca.
   bool settle = true,
+
+  /// Recibe lo que la pantalla devuelve al cerrarse (`pop(valor)`).
+  void Function(Object? result)? onResult,
 }) async {
   tester.view.physicalSize = const Size(800, 1600);
   tester.view.devicePixelRatio = 1;
@@ -87,9 +90,9 @@ Future<Harness> pumpProfile(
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
-              onPressed: () => Navigator.of(
-                context,
-              ).push<void>(MaterialPageRoute(builder: (_) => child)),
+              onPressed: () => Navigator.of(context)
+                  .push<Object?>(MaterialPageRoute(builder: (_) => child))
+                  .then((result) => onResult?.call(result)),
               child: const Text('abrir'),
             ),
           ),

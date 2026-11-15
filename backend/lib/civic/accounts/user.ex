@@ -1,8 +1,9 @@
 defmodule Civic.Accounts.User do
   @moduledoc """
   Una cuenta. Guarda un alias y el hash de la contraseña; **no** guarda nombre,
-  teléfono, correo, DNI ni IP. Los reportes y los votos no apuntan a esta tabla
-  (ver `Civic.Privacy`).
+  teléfono, correo, DNI ni IP. Si la cuenta se verificó, guarda solo la huella
+  HMAC del DNI (`verif_hash`, ver `Civic.Accounts.Verification`), nunca el
+  número. Los reportes y los votos no apuntan a esta tabla (ver `Civic.Privacy`).
   """
 
   use Ecto.Schema
@@ -25,6 +26,9 @@ defmodule Civic.Accounts.User do
     field :password, :string, virtual: true, redact: true
     field :password_hash, :string, redact: true
     field :nivel, Ecto.Enum, values: [:invitado, :verificado], default: :invitado
+    # HMAC del DNI (nunca el número) y versión de la clave usada; ver Civic.Privacy
+    field :verif_hash, :binary, redact: true
+    field :verif_version, :integer
     field :acepta_consentimiento, :boolean, virtual: true
 
     field :intentos_fallidos, :integer, default: 0
@@ -71,6 +75,19 @@ defmodule Civic.Accounts.User do
     |> validate_password()
     |> validate_distinta_de_la_actual(user)
     |> hash_password()
+  end
+
+  @doc """
+  Marca la cuenta como verificada con la huella de su DNI. El nivel y la huella
+  solo los decide el servidor (`Civic.Accounts.Verification`), nunca el cliente.
+
+  Si otra cuenta ya tiene esa huella, el índice único de la base lo rechaza y el
+  error queda en `:verif_hash`.
+  """
+  def verification_changeset(user, hash, version) do
+    user
+    |> change(nivel: :verificado, verif_hash: hash, verif_version: version)
+    |> unique_constraint(:verif_hash, name: :usuarios_verif_hash_index, message: "ya está en uso")
   end
 
   # Solo si lo demás es válido: no vale la pena un segundo hash para una
