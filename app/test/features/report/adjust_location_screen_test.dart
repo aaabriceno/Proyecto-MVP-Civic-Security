@@ -68,6 +68,81 @@ void main() {
     expect(find.byType(FlutterMap), findsOneWidget);
   });
 
+  group(
+    'no tapa el mapa (se vio en una tablet: la tarjeta de arriba ocupaba todo)',
+    () {
+      testWidgets('la tarjeta de instrucciones es chica y queda arriba', (
+        tester,
+      ) async {
+        await _pump(tester);
+
+        final tarjeta = tester.getRect(
+          find.ancestor(
+            of: find.text('¿Dónde ocurrió exactamente?'),
+            matching: find.byType(Card),
+          ),
+        );
+
+        // La pantalla de la prueba mide 1000 x 1600
+        expect(tarjeta.height, lessThan(250));
+        expect(tarjeta.bottom, lessThan(350));
+      });
+
+      testWidgets('el pin del centro queda a la vista, sin nada encima', (
+        tester,
+      ) async {
+        await _pump(tester);
+
+        final pin = tester.getCenter(find.byKey(const Key('pin-central')));
+        final tarjeta = tester.getRect(
+          find.ancestor(
+            of: find.text('¿Dónde ocurrió exactamente?'),
+            matching: find.byType(Card),
+          ),
+        );
+        final inferior = tester.getRect(
+          find
+              .ancestor(
+                of: find.byKey(const Key('confirmar-ubicacion')),
+                matching: find.byType(Material),
+              )
+              .first,
+        );
+
+        expect(
+          tarjeta.contains(pin),
+          isFalse,
+          reason: 'la tarjeta de arriba tapa el pin',
+        );
+        expect(
+          inferior.contains(pin),
+          isFalse,
+          reason: 'la tarjeta de abajo tapa el pin',
+        );
+      });
+
+      testWidgets(
+        'el centro del mapa recibe los toques y gestos (nada lo cubre)',
+        (tester) async {
+          await _pump(tester);
+          final centro = tester.getCenter(find.byType(FlutterMap));
+
+          // El primer widget bajo el dedo, en el centro, debe pertenecer al mapa
+          final resultado = tester.hitTestOnBinding(centro);
+          final tocados = resultado.path
+              .map((e) => e.target.runtimeType.toString())
+              .toList();
+
+          expect(
+            tocados.any((t) => t.contains('Card') || t.contains('_BottomCard')),
+            isFalse,
+            reason: 'una tarjeta está encima del centro: $tocados',
+          );
+        },
+      );
+    },
+  );
+
   testWidgets('muestra la distancia al usuario cuando se conoce', (
     tester,
   ) async {

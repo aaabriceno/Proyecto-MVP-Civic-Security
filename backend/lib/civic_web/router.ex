@@ -73,6 +73,7 @@ defmodule CivicWeb.Router do
     pipe_through [:api, :limit_read]
 
     get "/map/snapshot", MapController, :snapshot
+    get "/map/heat", MapController, :heat
   end
 
   scope "/v1", CivicWeb do
