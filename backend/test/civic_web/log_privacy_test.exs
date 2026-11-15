@@ -80,4 +80,27 @@ defmodule CivicWeb.LogPrivacyTest do
     assert log =~ "/v1/auth/refresh"
     refute log =~ tokens.refresh_token
   end
+
+  test "verificación: el DNI no aparece en el log real", %{conn: conn} do
+    {:ok, user} =
+      Accounts.register(%{
+        "alias" => "Log-Priv-3",
+        "password" => @password,
+        "acepta_consentimiento" => true
+      })
+
+    {:ok, %{access_token: access}} = Sessions.issue(user)
+    dni = "47283916"
+
+    log =
+      capturar(fn ->
+        conn
+        |> put_req_header("authorization", "Bearer " <> access)
+        |> put_req_header("content-type", "application/json")
+        |> post(~p"/v1/verification/dni", %{"dni" => dni})
+      end)
+
+    assert log =~ "/v1/verification/dni"
+    refute log =~ dni
+  end
 end

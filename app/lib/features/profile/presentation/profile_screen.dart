@@ -8,6 +8,7 @@ import '../data/account_service.dart';
 import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
 import 'profile_format.dart';
+import 'verify_dni_screen.dart';
 
 const _fondo = Color(0xFFF7F8FA);
 const _verde = Color(0xFF15803D);
@@ -28,6 +29,14 @@ class ProfileScreen extends ConsumerWidget {
     if (context.mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
+  }
+
+  // Al verificarse, el perfil que se ve ya no es el del servidor: se vuelve a pedir
+  Future<void> _verify(BuildContext context, WidgetRef ref) async {
+    final done = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const VerifyDniScreen()));
+    if (done == true) ref.invalidate(profileProvider);
   }
 
   @override
@@ -58,7 +67,10 @@ class ProfileScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
               children: [
                 profile.when(
-                  data: (user) => _Header(user: user),
+                  data: (user) => _Header(
+                    user: user,
+                    onVerify: () => _verify(context, ref),
+                  ),
                   loading: () => const Padding(
                     padding: EdgeInsets.symmetric(vertical: 48),
                     child: Center(child: CircularProgressIndicator()),
@@ -212,9 +224,10 @@ class _InfoBlock extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.user});
+  const _Header({required this.user, required this.onVerify});
 
   final AuthUser user;
+  final VoidCallback onVerify;
 
   @override
   Widget build(BuildContext context) {
@@ -297,6 +310,10 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
+        if (!verified) ...[
+          const SizedBox(height: 12),
+          _VerifyCard(onTap: onVerify),
+        ],
         const Padding(
           padding: EdgeInsets.fromLTRB(4, 8, 4, 0),
           child: Text(
@@ -306,6 +323,63 @@ class _Header extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Invita a verificar la cuenta con el DNI (solo si aún no lo está).
+class _VerifyCard extends StatelessWidget {
+  const _VerifyCard({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // Material + InkWell (y no un Container con decoración encima): así el
+    // destello del toque se ve
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: authBorder),
+      ),
+      child: InkWell(
+        key: const Key('perfil-verificar'),
+        customBorder: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        onTap: onTap,
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.verified_user_outlined, color: authBlue),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Verifica tu DNI',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: authText,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Haz más reportes al día. No guardamos tu número.',
+                      style: TextStyle(color: authMuted),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: authMuted),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

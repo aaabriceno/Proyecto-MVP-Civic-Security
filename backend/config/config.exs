@@ -58,6 +58,10 @@ config :civic, Civic.Incidents.Quota,
   sin_verificar: {3, :timer.hours(24)},
   verificado: {10, :timer.hours(24)}
 
+# Intentos de verificar el DNI por cuenta y por día (ver Civic.Accounts.Verification).
+# Pocos, porque "ese DNI ya tiene cuenta" revela quién usa la app.
+config :civic, Civic.Accounts.Verification, dni_attempts: {5, :timer.hours(24)}
+
 # Cuántos registros/inicios de sesión se atienden a la vez (ver Civic.HashGate).
 # Pasado el tope se responde 503 al instante. Con ~50 ms por hash, 8 a la vez
 # cubren de sobra el uso normal y la cola máxima dura una fracción de segundo.
