@@ -70,6 +70,14 @@ defmodule CivicWeb.FallbackController do
     })
   end
 
+  def call(conn, {:error, :invalid_window}) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{
+      error: %{code: "invalid_window", message: "ventana debe ser 1h, 24h o 7d"}
+    })
+  end
+
   def call(conn, {:error, %Ecto.Changeset{} = changeset}) do
     fields =
       Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
