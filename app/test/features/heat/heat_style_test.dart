@@ -106,6 +106,16 @@ void main() {
     });
   });
 
+  group('zoneTitle', () {
+    test('no exagera: solo 5 o más reportes son "alta actividad"', () {
+      expect(zoneTitle(1), 'Reporte en esta zona');
+      expect(zoneTitle(2), 'Zona con actividad');
+      expect(zoneTitle(4), 'Zona con actividad');
+      expect(zoneTitle(5), 'Zona de alta actividad');
+      expect(zoneTitle(25), 'Zona de alta actividad');
+    });
+  });
+
   group('zoneSummary', () {
     test('cuenta reportes y tipos, del más al menos frecuente', () {
       final cell = _cell({IncidentType.peleaColegio: 2, IncidentType.robo: 5});

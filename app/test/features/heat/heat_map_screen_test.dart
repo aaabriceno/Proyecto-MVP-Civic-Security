@@ -238,6 +238,17 @@ void main() {
       expect(find.textContaining('reportes en 7 días'), findsOneWidget);
     });
 
+    testWidgets('con 1 reporte el cuadro no habla de "alta actividad"', (
+      tester,
+    ) async {
+      await _pump(tester, _FakeRepo(_conUnaCelda(count: 1)));
+
+      await _tapAt(tester, tester.getCenter(find.byType(FlutterMap)));
+
+      expect(find.text('Reporte en esta zona'), findsOneWidget);
+      expect(find.text('Zona de alta actividad'), findsNothing);
+    });
+
     testWidgets('un solo reporte usa el singular', (tester) async {
       final repo = _FakeRepo(
         const HeatMap(

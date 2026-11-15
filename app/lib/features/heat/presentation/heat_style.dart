@@ -49,6 +49,14 @@ List<CircleMarker> heatCircles(HeatMap data, {HeatCell? selected}) {
   ];
 }
 
+/// El título del cuadro de una zona. No exagera: "alta actividad" es de 5
+/// reportes en adelante; con menos se dice lo que hay.
+String zoneTitle(int count) => switch (count) {
+  1 => 'Reporte en esta zona',
+  < 5 => 'Zona con actividad',
+  _ => 'Zona de alta actividad',
+};
+
 /// "7 reportes en 24 h · 5 robos, 2 peleas".
 String zoneSummary(HeatCell cell, HeatWindow window) {
   final reportes = '${cell.count} ${cell.count == 1 ? 'reporte' : 'reportes'}';
