@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/env.dart';
+import '../config/server_address.dart';
 
 /// En una build de producción la API debe usar https: con http cualquiera en
 /// la misma red podría leer o alterar los reportes. Falla al arrancar en lugar
@@ -16,12 +17,14 @@ void validateApiUrl(String url, {required bool release}) {
 }
 
 /// Un cliente HTTP nuevo hacia la API. Lo usan [dioProvider] y el cliente con
-/// sesión (`sessionDioProvider`).
-Dio newApiClient() {
-  validateApiUrl(apiUrl, release: kReleaseMode);
+/// sesión (`sessionDioProvider`). [baseUrl] es el servidor elegido (por omisión
+/// el de compilación).
+Dio newApiClient({String? baseUrl}) {
+  final url = baseUrl ?? apiUrl;
+  validateApiUrl(url, release: kReleaseMode);
   return Dio(
     BaseOptions(
-      baseUrl: apiUrl,
+      baseUrl: url,
       connectTimeout: const Duration(seconds: 8),
       receiveTimeout: const Duration(seconds: 10),
       headers: {'accept': 'application/json'},
@@ -30,4 +33,6 @@ Dio newApiClient() {
 }
 
 /// Cliente sin sesión: el registro, el inicio de sesión y todo lo público.
-final dioProvider = Provider<Dio>((ref) => newApiClient());
+final dioProvider = Provider<Dio>(
+  (ref) => newApiClient(baseUrl: ref.watch(serverUrlProvider)),
+);

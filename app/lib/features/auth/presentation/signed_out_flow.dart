@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_controller.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
+import 'server_address_link.dart';
 import 'welcome_screen.dart';
 
 enum _Screen { welcome, login, register, publicMap }
@@ -15,7 +17,15 @@ enum _Screen { welcome, login, register, publicMap }
 /// sesión se abre, quien lo muestra (la puerta) lo reemplaza por completo y no
 /// queda ninguna pantalla de login "debajo" del mapa.
 class SignedOutFlow extends ConsumerStatefulWidget {
-  const SignedOutFlow({super.key, required this.publicMapBuilder});
+  const SignedOutFlow({
+    super.key,
+    required this.publicMapBuilder,
+    this.showServerAddress = !kReleaseMode,
+  });
+
+  /// ¿La bienvenida deja cambiar el servidor? Solo en las versiones de prueba:
+  /// la final no (por omisión, según el modo de la compilación).
+  final bool showServerAddress;
 
   /// El mapa de solo lectura; `onSignIn` vuelve al inicio de sesión.
   final Widget Function(BuildContext context, VoidCallback onSignIn)
@@ -51,7 +61,11 @@ class _SignedOutFlowState extends ConsumerState<SignedOutFlow> {
         if (!didPop && previous != null) _go(previous);
       },
       child: switch (_screen) {
-        _Screen.welcome => WelcomeScreen(onStart: () => _go(_Screen.login)),
+        _Screen.welcome => WelcomeScreen(
+          onStart: () => _go(_Screen.login),
+          // Solo en las versiones de prueba: la final no deja cambiar de servidor
+          footer: widget.showServerAddress ? const ServerAddressLink() : null,
+        ),
         _Screen.login => LoginScreen(
           onRegister: () => _go(_Screen.register),
           onViewMap: () => _go(_Screen.publicMap),

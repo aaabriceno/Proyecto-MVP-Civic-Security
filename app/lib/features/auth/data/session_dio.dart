@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/server_address.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/auth_interceptor.dart';
 import 'session_manager.dart';
@@ -12,7 +13,7 @@ import 'session_manager.dart';
 /// Es distinto de [dioProvider] a propósito: el cliente de las cuentas no puede
 /// depender de la sesión, porque es el que la renueva.
 final sessionDioProvider = Provider<Dio>((ref) {
-  final dio = newApiClient();
+  final dio = newApiClient(baseUrl: ref.watch(serverUrlProvider));
   final session = ref.watch(sessionManagerProvider);
   dio.interceptors.add(
     AuthInterceptor(

@@ -329,9 +329,29 @@ cd app
 flutter build apk --profile --dart-define=API_URL=http://192.168.1.7:4000
 ```
 
-El instalador queda en `app/build/app/outputs/flutter-apk/app-profile.apk`. Se lo pasas a cada persona; en su teléfono tiene que permitir "instalar apps de orígenes desconocidos". Todos deben estar en la **misma red Wi-Fi** que tu computadora y con tu servidor encendido.
+El instalador queda en `app/build/app/outputs/flutter-apk/app-profile.apk` (unos 85 MB). Se lo pasas a cada persona; en su teléfono tiene que permitir "instalar apps de orígenes desconocidos". Todos deben estar en la **misma red Wi-Fi** que tu computadora y con tu servidor encendido. Se usa `--profile` y no `--release` porque la versión *release* exige https y bloquea las direcciones `http://`.
 
-> Esta parte del proceso (generar el APK y que otros lo instalen) todavía **no se ha probado**. Se usa `--profile` y no `--release` porque la versión *release* exige https y bloquea las direcciones `http://`.
+**La dirección del servidor se cambia desde la app, sin recompilar.** En la pantalla de bienvenida, bajo el botón "Comenzar", dice *"Servidor: 192.168.1.7:4000 · Cambiar"* (solo en las versiones de prueba; la versión final no lo muestra). Tocas **Cambiar**, escribes la **IP de la computadora que corre el servidor** y:
+
+- **Probar** pide `/health` a esa dirección y dice si el servidor responde (no guarda nada).
+- **Guardar** la deja guardada, **cierra la sesión** (los tokens de un servidor no sirven en otro) y reinicia la app con la dirección nueva.
+- **Restablecer** vuelve a la dirección con la que se compiló el APK.
+
+Basta escribir la IP (`172.20.10.14`): la app entiende `http://` y el puerto `4000`. Si la escribes con puerto (`172.20.10.14:5000`) o con `https://` se respeta tal cual. Se rechazan rutas, parámetros y usuario/clave.
+
+Así puedes mandar **el mismo APK** a los celulares de tus compañeros con anticipación (WhatsApp, Drive) y, ya en el lugar, cada uno solo escribe la IP de tu computadora. Si la computadora recibe siempre la misma IP en esa red, mejor aún: se compila una vez con ella.
+
+**La IP de tu computadora en la red a la que te conectes** (por ejemplo, el hotspot de tu celular):
+
+```bash
+ip -4 route get 1.1.1.1 | grep -o 'src [0-9.]*'
+```
+
+Un hotspot de iPhone siempre usa `172.20.10.x`; los de Android suelen usar `192.168.43.x` u otro rango. La IP puede cambiar cada vez que te conectas.
+
+> Los comandos para el día de la presentación (arrancar, instalar el APK **por cable** en otros celulares, datos y pruebas) están juntos en la [guía de demostración](guia-demostracion.md).
+
+> **Probado el 2026-11-18** en el emulador de Android Studio (Pixel 9 Pro XL): la app apuntó a `192.168.1.7:4000` y a `10.0.2.2:4000` (la misma computadora vista desde el emulador), recordó la dirección al reabrirse y cargó el mapa y el tiempo real. En un celular real por Wi-Fi está probado hasta `/health` desde el navegador de la tablet.
 
 ---
 
@@ -415,7 +435,7 @@ El mapa solo muestra los incidentes de las **últimas 24 horas**. Los 80 inciden
 
 Para volver a tener pines:
 
-**Opción 1: resembrar** (borra los incidentes de desarrollo y crea 80 nuevos con fechas relativas a hoy; solo una parte cae en las últimas 24 h, en la última prueba unos 30 de 80):
+**Opción 1: resembrar** (**borra TODOS los incidentes de desarrollo, también los que hayas creado tú desde la app**, y crea 80 nuevos con fechas relativas a hoy; solo una parte cae en las últimas 24 h, en la última prueba unos 30 de 80):
 
 ```bash
 cd backend

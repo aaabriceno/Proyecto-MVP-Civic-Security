@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/config/env.dart';
+import '../../../core/config/server_address.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/realtime/phoenix_channel.dart';
 import '../../incident/domain/incident.dart';
@@ -71,9 +71,10 @@ class PhoenixIncidentStream implements IncidentStream {
 
 final incidentStreamProvider = Provider<IncidentStream>((ref) {
   // Mismo control que la API REST: en producción solo https, y por tanto wss
-  validateApiUrl(apiUrl, release: kReleaseMode);
+  final url = ref.watch(serverUrlProvider);
+  validateApiUrl(url, release: kReleaseMode);
   final stream = PhoenixIncidentStream(
-    PhoenixChannel(url: realtimeUrl(apiUrl), topic: mapTopic),
+    PhoenixChannel(url: realtimeUrl(url), topic: mapTopic),
   );
   ref.onDispose(stream.dispose);
   return stream;

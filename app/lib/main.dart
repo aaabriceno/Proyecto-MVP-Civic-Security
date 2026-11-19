@@ -1,8 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'app/app.dart';
+import 'app/civic_root.dart';
+import 'core/config/server_address.dart';
 
-void main() {
-  runApp(const ProviderScope(child: CivicApp()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final saved = await loadSavedServer(
+    SecureServerAddressStore(),
+    release: kReleaseMode,
+  );
+  runApp(CivicRoot(initialServerUrl: saved));
 }

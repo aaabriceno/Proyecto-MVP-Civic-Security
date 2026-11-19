@@ -10,9 +10,13 @@ import 'auth_widgets.dart';
 /// así) y tenía erratas ("manter", "poblacion"): aquí la ilustración se dibuja
 /// en código y el texto está corregido.
 class WelcomeScreen extends StatelessWidget {
-  const WelcomeScreen({super.key, required this.onStart});
+  const WelcomeScreen({super.key, required this.onStart, this.footer});
 
   final VoidCallback onStart;
+
+  /// Algo bajo el botón "Comenzar" (en las versiones de prueba, la dirección del
+  /// servidor).
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +37,9 @@ class WelcomeScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _Illustration(height: illustrationHeight),
-                      Expanded(child: _Greeting(onStart: onStart)),
+                      Expanded(
+                        child: _Greeting(onStart: onStart, footer: footer),
+                      ),
                     ],
                   ),
                 ),
@@ -81,9 +87,10 @@ class _Illustration extends StatelessWidget {
 
 /// El saludo y el botón "Comenzar".
 class _Greeting extends StatelessWidget {
-  const _Greeting({required this.onStart});
+  const _Greeting({required this.onStart, this.footer});
 
   final VoidCallback onStart;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +134,7 @@ class _Greeting extends StatelessWidget {
                 label: 'Comenzar',
                 onPressed: onStart,
               ),
+              if (footer != null) ...[const SizedBox(height: 12), footer!],
             ],
           ),
         ),
