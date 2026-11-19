@@ -39,6 +39,21 @@ for {nivel, variable} <- [
   end
 end
 
+# Validación comunitaria: cuántos votos iguales cambian el estado de un reporte y
+# a qué distancia (en metros) hay que estar para votar. Los valores por defecto
+# están en config.exs; estas variables permiten ajustarlos en una demostración
+# (p. ej. CIVIC_VOTE_THRESHOLD=2 con dos dispositivos) sin tocar el código.
+for {opcion, variable} <- [threshold: "CIVIC_VOTE_THRESHOLD", radius_m: "CIVIC_VOTE_RADIUS_M"],
+    valor = System.get_env(variable) do
+  case Integer.parse(valor) do
+    {numero, ""} when numero > 0 ->
+      config :civic, Civic.Validation, [{opcion, numero}]
+
+    _ ->
+      raise "#{variable} debe ser un entero positivo (recibido: #{inspect(valor)})"
+  end
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

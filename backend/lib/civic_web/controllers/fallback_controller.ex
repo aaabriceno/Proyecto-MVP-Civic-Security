@@ -156,6 +156,76 @@ defmodule CivicWeb.FallbackController do
     })
   end
 
+  # --- Validación comunitaria (votos) ---
+
+  # Solo las cuentas verificadas con DNI votan: una persona, una cuenta
+  def call(conn, {:error, :not_verified}) do
+    conn
+    |> put_status(:forbidden)
+    |> json(%{
+      error: %{
+        code: "not_verified",
+        message: "Verifica tu cuenta con el DNI para confirmar o negar reportes"
+      }
+    })
+  end
+
+  def call(conn, {:error, :own_report}) do
+    conn
+    |> put_status(:forbidden)
+    |> json(%{
+      error: %{code: "own_report", message: "No puedes votar tu propio reporte"}
+    })
+  end
+
+  def call(conn, {:error, :already_voted}) do
+    conn
+    |> put_status(:conflict)
+    |> json(%{error: %{code: "already_voted", message: "Ya votaste en este reporte"}})
+  end
+
+  # Verificado o descartado: la comunidad ya decidió
+  def call(conn, {:error, :voting_closed}) do
+    conn
+    |> put_status(:conflict)
+    |> json(%{error: %{code: "voting_closed", message: "Este reporte ya no recibe votos"}})
+  end
+
+  def call(conn, {:error, :too_far}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{
+      error: %{
+        code: "too_far",
+        message: "Estás muy lejos del lugar para votar este reporte"
+      }
+    })
+  end
+
+  def call(conn, {:error, :invalid_vote}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{
+      error: %{
+        code: "validation_failed",
+        message: "Datos inválidos",
+        fields: %{valor: ["debe ser confirmo o falso"]}
+      }
+    })
+  end
+
+  def call(conn, {:error, :invalid_location}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> json(%{
+      error: %{
+        code: "validation_failed",
+        message: "Datos inválidos",
+        fields: %{ubicacion: ["lat y lng deben ser números válidos"]}
+      }
+    })
+  end
+
   def call(conn, {:error, :photo_exists}) do
     conn
     |> put_status(:conflict)

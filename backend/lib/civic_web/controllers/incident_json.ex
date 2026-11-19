@@ -19,6 +19,8 @@ defmodule CivicWeb.IncidentJSON do
       lng: lng,
       estado: incident.estado,
       tiene_foto: incident.tiene_foto,
+      confirmaciones: incident.confirmaciones,
+      falsos: incident.falsos,
       creado_en: incident.inserted_at
     }
   end

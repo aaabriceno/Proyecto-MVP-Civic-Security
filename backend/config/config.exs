@@ -58,6 +58,10 @@ config :civic, Civic.Incidents.Quota,
   sin_verificar: {3, :timer.hours(24)},
   verificado: {10, :timer.hours(24)}
 
+# Validación comunitaria (ver Civic.Validation): cuántos votos iguales cambian el
+# estado de un reporte y a qué distancia máxima (en metros) hay que estar para votar.
+config :civic, Civic.Validation, threshold: 3, radius_m: 1000
+
 # Intentos de verificar el DNI por cuenta y por día (ver Civic.Accounts.Verification).
 # Pocos, porque "ese DNI ya tiene cuenta" revela quién usa la app.
 config :civic, Civic.Accounts.Verification, dni_attempts: {5, :timer.hours(24)}

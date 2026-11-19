@@ -33,7 +33,7 @@ En los grupos de WhatsApp de seguridad vecinal circula mucha información, pero 
 - **App Android:** mapa en vivo con tu ubicación y su círculo de precisión, filtros, reporte anónimo, y las pantallas de bienvenida, inicio de sesión y registro, con 339 pruebas automáticas.
 - **CI:** cada cambio pasa pruebas, análisis estático, auditoría de dependencias y búsqueda de secretos antes de entrar a `main`.
 
-Pendiente: validación comunitaria, alertas por zona y difuminado de rostros en las fotos.
+Pendiente: alertas por zona, reputación de las cuentas y difuminado de rostros en las fotos.
 
 ## Cómo ejecutarlo
 

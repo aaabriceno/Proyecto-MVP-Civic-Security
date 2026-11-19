@@ -129,8 +129,18 @@ for _ <- 1..total do
   {:ok, :created, incidente} = Incidents.create_incident(attrs, Ecto.UUID.generate())
   fecha = fecha_al_azar.()
 
+  # Los contadores acompañan al estado, como si la comunidad ya hubiera votado
+  estado = estado_al_azar.()
+  votos = Civic.Validation.threshold()
+
   Repo.update_all(from(i in Incident, where: i.id == ^incidente.id),
-    set: [estado: estado_al_azar.(), inserted_at: fecha, updated_at: fecha]
+    set: [
+      estado: estado,
+      confirmaciones: if(estado == :verificado, do: votos, else: 0),
+      falsos: if(estado == :descartado, do: votos, else: 0),
+      inserted_at: fecha,
+      updated_at: fecha
+    ]
   )
 end
 

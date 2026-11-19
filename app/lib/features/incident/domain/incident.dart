@@ -42,6 +42,16 @@ enum IncidentStatus {
   }
 }
 
+/// El voto de la comunidad sobre un reporte. [wire] es el valor que usa la API.
+enum VoteValue {
+  confirmo('confirmo'),
+  falso('falso');
+
+  const VoteValue(this.wire);
+
+  final String wire;
+}
+
 class Incident {
   const Incident({
     required this.id,
@@ -51,6 +61,8 @@ class Incident {
     required this.estado,
     required this.creadoEn,
     this.tieneFoto = false,
+    this.confirmaciones = 0,
+    this.falsos = 0,
   });
 
   /// Convierte el JSON de la API. Devuelve `null` si el tipo o el estado no se
@@ -76,6 +88,9 @@ class Incident {
         creadoEn: DateTime.parse(json['creado_en'] as String).toUtc(),
         // Un servidor más viejo no manda el campo: sin foto
         tieneFoto: json['tiene_foto'] as bool? ?? false,
+        // Idem: un servidor sin validación comunitaria no manda los votos
+        confirmaciones: json['confirmaciones'] as int? ?? 0,
+        falsos: json['falsos'] as int? ?? 0,
       );
     } on TypeError catch (e) {
       throw FormatException('Incidente malformado: $e');
@@ -94,6 +109,11 @@ class Incident {
   /// ¿Quien lo reportó adjuntó una foto? Se pide aparte (`fetchPhoto`).
   final bool tieneFoto;
 
+  /// Cuántas cuentas verificadas lo confirman y cuántas dicen que es falso.
+  /// Cuando uno llega al umbral del servidor, [estado] cambia.
+  final int confirmaciones;
+  final int falsos;
+
   /// Una copia con la foto indicada (el resto no cambia).
   Incident copyWith({bool? tieneFoto}) => Incident(
     id: id,
@@ -103,6 +123,8 @@ class Incident {
     estado: estado,
     creadoEn: creadoEn,
     tieneFoto: tieneFoto ?? this.tieneFoto,
+    confirmaciones: confirmaciones,
+    falsos: falsos,
   );
 }
 

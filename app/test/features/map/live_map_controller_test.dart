@@ -37,6 +37,10 @@ class _FakeRepo implements IncidentRepository {
   @override
   Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
 
+  @override
+  Future<Incident> vote(String incidentId, VoteValue value, LatLng position) =>
+      throw UnimplementedError();
+
   final calls = <Bbox>[];
   List<Incident> next = [];
 
