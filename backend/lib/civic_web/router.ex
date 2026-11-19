@@ -69,6 +69,8 @@ defmodule CivicWeb.Router do
     post "/incidents", IncidentController, :create
     # Hace un HMAC (barato), no Argon2: no necesita el tope de hashes simultáneos
     post "/verification/dni", VerificationController, :dni
+    # Confirmar o negar el reporte de otra persona (validación comunitaria)
+    post "/incidents/:id/votes", VoteController, :create
   end
 
   # La foto de un reporte. Van sin el pipeline :api: el cuerpo no es JSON y quien

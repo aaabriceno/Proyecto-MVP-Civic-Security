@@ -54,8 +54,11 @@ defmodule CivicWeb.IncidentControllerTest do
              "estado" => "sin_verificar"
            } = data
 
+    # Un reporte nuevo empieza sin votos
+    assert %{"confirmaciones" => 0, "falsos" => 0} = data
+
     assert Map.keys(data) |> Enum.sort() ==
-             ["creado_en", "descripcion", "estado", "id", "lat", "lng", "tiene_foto", "tipo"]
+             ~w(confirmaciones creado_en descripcion estado falsos id lat lng tiene_foto tipo)
   end
 
   test "200 al repetir la misma idempotency-key devuelve el mismo id", %{conn: conn, user: user} do

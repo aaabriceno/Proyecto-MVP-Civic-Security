@@ -70,6 +70,30 @@ class ReportFakeRepo implements IncidentRepository {
     );
   }
 
+  /// Cada voto enviado: el id del reporte, el voto y desde dónde.
+  final votes = <(String, VoteValue, LatLng)>[];
+
+  /// Lo que responde el siguiente voto (el reporte con sus contadores nuevos).
+  Incident? voteResult;
+
+  /// Si no es null, el siguiente voto falla con esto.
+  ApiFailure? voteFailure;
+
+  /// Si no es null, los votos esperan a que este completer termine.
+  Completer<void>? voteGate;
+
+  @override
+  Future<Incident> vote(
+    String incidentId,
+    VoteValue value,
+    LatLng position,
+  ) async {
+    votes.add((incidentId, value, position));
+    if (voteGate != null) await voteGate!.future;
+    if (voteFailure != null) throw voteFailure!;
+    return voteResult!;
+  }
+
   /// Lo que devuelve `fetchPhoto` por id de reporte.
   final photos = <String, Uint8List>{};
 

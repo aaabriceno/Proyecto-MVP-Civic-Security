@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_failure.dart';
 import '../../../core/network/auth_interceptor.dart';
@@ -33,6 +34,13 @@ abstract interface class IncidentRepository {
   /// Los bytes de la foto de un reporte. Es pública, como el mapa: no manda la
   /// sesión. Lanza [ApiFailure] (`not_found` si no tiene foto).
   Future<Uint8List> fetchPhoto(String incidentId);
+
+  /// Confirma o niega el reporte [incidentId] (validación comunitaria). [position]
+  /// es dónde está la persona: el servidor comprueba que esté cerca del lugar y
+  /// no la guarda. Devuelve el reporte con sus contadores y su estado nuevos.
+  /// Lanza [ApiFailure] (`not_verified`, `own_report`, `already_voted`,
+  /// `voting_closed`, `too_far`...).
+  Future<Incident> vote(String incidentId, VoteValue value, LatLng position);
 }
 
 class HttpIncidentRepository implements IncidentRepository {
@@ -90,6 +98,36 @@ class HttpIncidentRepository implements IncidentRepository {
         // La foto cruda, no JSON ni multipart
         data: jpeg,
         options: conSesion(Options(contentType: 'image/jpeg')),
+      );
+      final body = response.data;
+      final data = body is Map ? body['data'] : null;
+      final incident = data is Map<String, dynamic>
+          ? Incident.tryFromJson(data)
+          : null;
+      if (incident == null) throw const ApiFailure.invalidResponse();
+      return incident;
+    } on DioException catch (e) {
+      throw ApiFailure.fromDio(e);
+    } on FormatException {
+      throw const ApiFailure.invalidResponse();
+    }
+  }
+
+  @override
+  Future<Incident> vote(
+    String incidentId,
+    VoteValue value,
+    LatLng position,
+  ) async {
+    try {
+      final response = await _dio.post<Object?>(
+        '/v1/incidents/$incidentId/votes',
+        data: {
+          'valor': value.wire,
+          'lat': position.latitude,
+          'lng': position.longitude,
+        },
+        options: conSesion(Options()),
       );
       final body = response.data;
       final data = body is Map ? body['data'] : null;

@@ -46,6 +46,11 @@ defmodule Civic.Incidents.Incident do
     # cliente al crear: no está en `cast`, solo lo cambia Civic.Evidence.
     field :tiene_foto, :boolean, default: false
 
+    # Cuántas cuentas verificadas lo confirman o lo niegan (ver Civic.Validation).
+    # No están en `cast`: solo cambian con un voto.
+    field :confirmaciones, :integer, default: 0
+    field :falsos, :integer, default: 0
+
     field :lat, :float, virtual: true
     field :lng, :float, virtual: true
 

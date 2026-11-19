@@ -58,6 +58,10 @@ class _Repositorio implements IncidentRepository {
   @override
   Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
 
+  @override
+  Future<Incident> vote(String incidentId, VoteValue value, LatLng position) =>
+      throw UnimplementedError();
+
   _Repositorio(this.incidentes);
 
   final List<Incident> incidentes;

@@ -454,6 +454,41 @@ Para ver en la base qué quedó guardado (solo la huella, nunca el número):
 docker exec civic_db psql -U postgres -d civic_dev -c \
   "select alias, nivel, left(encode(verif_hash, 'hex'), 16) || '…' as huella from usuarios;"
 
+### Validación comunitaria: confirmar o negar un reporte
+
+Al abrir un reporte (tocar un pin o una fila de la lista) aparece **"¿Es verídico este reporte?"**, con cuántas personas lo **confirman** y cuántas dicen que es **falso**, y los botones **Lo confirmo** y **Es falso**.
+
+Las reglas las decide el **servidor** (`POST /v1/incidents/:id/votes`), no la app:
+
+| Regla | Qué pasa si no se cumple |
+|---|---|
+| La cuenta debe estar **verificada con el DNI** | 403 `not_verified` ("Verifica tu cuenta con el DNI en tu perfil") |
+| **No puedes votar tu propio reporte** | 403 `own_report` |
+| Hay que estar a **menos de 1 km** del lugar (tu ubicación solo se usa para esto y **no se guarda**) | 422 `too_far` |
+| **Un voto por cuenta** y reporte; no se puede cambiar | 409 `already_voted` |
+| El reporte sigue **sin verificar** | 409 `voting_closed` (ya quedó Verificado o Descartado) |
+
+**3 confirmaciones** de 3 cuentas distintas → el reporte pasa a **Verificado**. **3 "Es falso"** → **Descartado** (el pin se ve apagado). Los demás dispositivos lo ven **al instante** por el canal en vivo (`incidente_actualizado`), incluso con el detalle abierto.
+
+Del voto solo se guarda `HMAC(k_vote, cuenta ‖ reporte)`: sirve para que una cuenta no vote dos veces, pero **nadie puede ver de quién es cada voto** ni enlazar los votos de una persona entre reportes. Se puede comprobar:
+
+```bash
+docker exec civic_db psql -U postgres -d civic_dev -c "\d confirmaciones"
+docker exec civic_db psql -U postgres -d civic_dev -c \
+  "select valor, left(encode(voter_token,'hex'),12) || '…' as token from confirmaciones;"
+```
+
+**Probar con pocos dispositivos.** Cada dispositivo necesita su **propia cuenta**, verificada con un **DNI distinto** (perfil → Verificar). Con tablet y emulador solo hay 2 votantes (más el autor, que no cuenta), así que para la demostración baja el umbral a 2 y el radio si hace falta:
+
+```bash
+cd backend
+CIVIC_LAN=1 CIVIC_VOTE_THRESHOLD=2 mix phx.server
+```
+
+Y recuerda que quien vota tiene que estar **cerca del reporte**: el emulador usa la ubicación que le pongas (`adb -s emulator-5554 emu geo fix -71.5375 -16.409`, primero longitud y luego latitud). Si por algún motivo el GPS no coopera en una demostración, `CIVIC_VOTE_RADIUS_M=5000` ensancha el radio sin tocar el código.
+
+> **Fuera del MVP:** no se detecta la ubicación falsa ni hay un tope de votos por cuenta y hora (solo el límite por IP de cualquier escritura); la reputación y su borrado criptográfico tampoco están. Ver `docs/arquitectura-mvp.md`.
+
 ### Foto en un reporte
 
 En el formulario de reporte, **Foto (opcional)**: **Cámara** o **Galería**.
@@ -553,6 +588,7 @@ Si nada de esto resuelve el problema, mira los registros del servidor (la termin
 | `API_URL` | `flutter run --dart-define=API_URL=...` | A qué servidor habla la app. Por omisión `http://10.0.2.2:4000`, la dirección de la computadora vista desde el emulador de Android |
 | `CIVIC_LAN` | `CIVIC_LAN=1 mix phx.server` | Abre el servidor a la red (Camino B) |
 | `CIVIC_CUPO_SIN_VERIFICAR`, `CIVIC_CUPO_VERIFICADO` | `mix phx.server` | Cuántos reportes nuevos por día puede hacer cada cuenta (por omisión 3 y 10). Útil para demostraciones |
+| `CIVIC_VOTE_THRESHOLD`, `CIVIC_VOTE_RADIUS_M` | `mix phx.server` | Cuántos votos iguales cambian el estado de un reporte (por omisión 3) y a cuántos metros hay que estar para votar (por omisión 1000). Útil para demostraciones |
 
 En desarrollo **no hace falta ningún archivo `.env`**: las claves, el acceso a la base (`postgres`/`postgres`) y el secreto del servidor están en `backend/config/dev.exs` y son **solo de desarrollo**. La base solo escucha en tu computadora, así que esas credenciales no son accesibles desde fuera.
 

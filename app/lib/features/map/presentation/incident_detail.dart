@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../incident/domain/incident.dart';
 import 'incident_photo.dart';
 import 'incident_style.dart';
+import 'map_incidents_controller.dart';
 import 'status_chip.dart';
+import 'vote_section.dart';
 
-/// Resumen de un incidente. Es provisional: el detalle completo, con la
-/// validación comunitaria ("Lo confirmo" / "Es falso"), llega después.
+/// Detalle de un incidente: qué pasó, cuándo y a qué distancia, su foto y la
+/// validación comunitaria ("Lo confirmo" / "Es falso").
 Future<void> showIncidentDetail(
   BuildContext context,
   Incident incident, {
@@ -21,14 +24,24 @@ Future<void> showIncidentDetail(
   );
 }
 
-class _IncidentDetail extends StatelessWidget {
+class _IncidentDetail extends ConsumerWidget {
   const _IncidentDetail({required this.incident, this.userPosition});
 
   final Incident incident;
   final LatLng? userPosition;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // La versión más nueva del reporte: si otra persona vota mientras esta hoja
+    // está abierta, los conteos y el estado cambian al instante
+    final incident =
+        ref.watch(
+          mapIncidentsProvider.select(
+            (s) =>
+                s.incidents.where((i) => i.id == this.incident.id).firstOrNull,
+          ),
+        ) ??
+        this.incident;
     final color = typeColor(incident.tipo);
     final distance = userPosition == null
         ? null
@@ -74,6 +87,7 @@ class _IncidentDetail extends StatelessWidget {
             const SizedBox(height: 14),
             IncidentPhoto(incidentId: incident.id),
           ],
+          VoteSection(incident: incident, userPosition: userPosition),
         ],
       ),
     );

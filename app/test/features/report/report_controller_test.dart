@@ -9,6 +9,7 @@ import 'package:civic_security/features/report/domain/new_incident.dart';
 import 'package:civic_security/features/report/presentation/report_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:latlong2/latlong.dart';
 
 import 'fakes.dart';
 
@@ -148,6 +149,10 @@ class _Boom implements IncidentRepository {
 
   @override
   Future<Uint8List> fetchPhoto(String incidentId) => throw UnimplementedError();
+
+  @override
+  Future<Incident> vote(String incidentId, VoteValue value, LatLng position) =>
+      throw UnimplementedError();
 
   @override
   Future<List<Incident>> fetchSnapshot(Bbox bbox) async => const [];
